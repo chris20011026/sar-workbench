@@ -1,0 +1,78 @@
+const $=id=>document.getElementById(id), token=document.querySelector('meta[name="api-token"]').content;
+let properties={}, current=null, projects=[], defaults={}, pickCallback, pickMode, reviewLoaded=null, objectURLs=[];
+const ionKeys=['do ionospheric phase estimation','apply ionospheric phase correction'];
+const labels={'polarization':'極化方式（polarization）','do ionospheric phase estimation':'估計電離層','apply ionospheric phase correction':'套用電離層校正','number of range looks 1':'Range looks · 第 1 階段','number of azimuth looks 1':'Azimuth looks · 第 1 階段','number of range looks 2':'Range looks · 第 2 階段','number of azimuth looks 2':'Azimuth looks · 第 2 階段','number of range looks ion':'Range looks · 電離層','number of azimuth looks ion':'Azimuth looks · 電離層','number of subsequent dates':'一般配對：後續日期數','number of subsequent dates for estimating ionosphere':'電離層配對：後續日期數'};
+const controlled=['data directory','dem for coregistration','dem for geocoding','water body','reference date of the stack','dates processing directory','dates resampled directory','pairs processing directory','baseline directory','dates directory for ionosphere','pairs processing directory for estimating ionosphere'];
+const initial=()=>Object.fromEntries(Object.keys(labels).map(k=>[k,'']));
+async function api(path,data){const r=await fetch(path,{method:data?'POST':'GET',headers:{'X-Token':token,...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined});const v=await r.json();if(!r.ok)throw Error(v.error||r.statusText);return v;}
+function fail(e){$('toast').textContent=e.message||e;$('toast').hidden=false;}
+function clear(){ $('toast').hidden=true; }
+function node(tag,text,cls){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;if(cls)n.className=cls;return n;}
+function action(el,fn){el.addEventListener('click',async e=>{e.preventDefault();clear();try{await fn(e);}catch(err){fail(err);}});}
+function renderProperties(){
+ const container=$('properties');container.replaceChildren();
+ for(const [key,val] of Object.entries(properties)){
+  if(controlled.includes(key))continue;
+  const row=node('div',undefined,'property'),label=node('label',labels[key]||key),selector=node('select');
+  selector.setAttribute('aria-label',(labels[key]||key)+' · 設定方式');
+  if(key==='polarization'){
+   for(const [value,text] of [['','使用程式預設值'],['HH','HH'],['HV','HV'],['VH','VH'],['VV','VV']]){const o=node('option',text);o.value=value;selector.append(o);}
+   if(val&&!['HH','HV','VH','VV'].includes(val)){const o=node('option',val+'（匯入值，請確認）');o.value=val;selector.append(o);}
+   selector.value=val;selector.onchange=()=>properties[key]=selector.value;label.append(selector);
+  }else if(ionKeys.includes(key)){
+   for(const [value,text] of [['','使用程式預設值'],['True','啟用（True）'],['False','關閉（False）']]){const o=node('option',text);o.value=value;selector.append(o);}
+   selector.value=val?String(val).toLowerCase()==='true'?'True':'False':'';
+   selector.onchange=()=>properties[key]=selector.value;
+   label.append(selector);
+  }else{
+   for(const [value,text] of [['default','使用程式預設值'],['custom','自行指定']]){const o=node('option',text);o.value=value;selector.append(o);}
+   selector.value=val?'custom':'default';
+   const input=node('input');input.value=val;input.disabled=!val;input.placeholder='未設定時不寫入 XML';input.setAttribute('aria-label',labels[key]||key);
+   input.oninput=()=>properties[key]=input.value;
+   selector.onchange=()=>{input.disabled=selector.value==='default';properties[key]=input.disabled?'':input.value;if(!input.disabled)input.focus();};
+   label.append(selector,input);
+  }
+  const hint=node('small',key==='polarization'?'對應 XML 的 polarization；請選擇影像實際包含的極化，學姊範例為 HH。':ionKeys.includes(key)?'預設值由目前安裝的 ISCE2 決定。':'使用預設值相當於原 XML 未設定或被註解。','hint');label.append(hint);
+  row.append(label);container.append(row);
+ }
+}
+
+async function browse(path){const data=await api('/api/browse?path='+encodeURIComponent(path));$('browsePath').value=data.path;$('up').onclick=()=>browse(data.parent).catch(fail);$('files').replaceChildren();for(const item of data.entries){if(pickMode!=='file'&&!item.dir)continue;const b=node('button',(item.dir?'▸  ':'   ')+item.name,'file');b.onclick=async()=>{if(item.dir){try{await browse(item.path);}catch(e){fail(e);}}else{$('picker').close();try{await pickCallback(item.path);}catch(e){fail(e);}}};$('files').append(b);} }
+let nativePending=false;
+async function choosePath(mode,callback,start){
+ if(nativePending)return;
+ const useNative=localStorage.getItem('alos-picker')!=='web';
+ if(useNative){
+  nativePending=true;
+  document.querySelectorAll('[data-pick],#importTemplate').forEach(b=>b.disabled=true);
+  $('pickerStatus').textContent='請在 macOS 選擇視窗中選取，或按取消返回。';
+  try{
+   const result=await api('/api/pick',{mode,start:start||defaults.home});
+   if(result.supported){if(!result.cancelled)await callback(result.path);return;}
+  }catch(e){fail(e);}
+  finally{nativePending=false;document.querySelectorAll('[data-pick],#importTemplate').forEach(b=>b.disabled=false);$('pickerStatus').textContent='';}
+ }
+ pickMode=mode;pickCallback=callback;$('chooseDir').hidden=mode==='file';$('files').textContent='正在讀取資料夾…';$('picker').showModal();await browse(start||defaults.home);
+}
+$('pickerPreference').value=localStorage.getItem('alos-picker')||'native';
+$('pickerPreference').onchange=()=>localStorage.setItem('alos-picker',$('pickerPreference').value);
+document.querySelectorAll('[data-pick]').forEach(b=>action(b,()=>choosePath(b.dataset.mode||'file',p=>{$(b.dataset.pick).value=b.dataset.mode==='newdir'?p+(window.selectedWorkflow==='alos2App'?'/alos2-pair':'/alos-project'):p;},$(b.dataset.pick).value||defaults.home)));
+action($('chooseDir'),async()=>{$('picker').close();await pickCallback($('browsePath').value);});
+action($('goPath'),()=>browse($('browsePath').value));$('closePicker').onclick=()=>$('picker').close();
+async function importTemplate(path){const d=await api('/api/template',{path});properties={...initial(),...d.properties};renderProperties();$('templateNote').textContent='已載入：'+path+'。已保留明確設定；未設定或註解的參數使用程式預設值。資料路徑以表單為準。';}
+action($('importTemplate'),()=>choosePath('file',importTemplate));
+action($('addProperty'),()=>{const k=$('propName').value.trim();if(!k||controlled.includes(k))throw Error('請輸入其他參數名稱；資料路徑請在上方設定。');properties[k]=$('propValue').value;renderProperties();$('propName').value='';$('propValue').value='';});
+action($('scan'),async()=>{const d=await api('/api/scan',{path:$('source').value});$('reference').replaceChildren(node('option','請選擇參考日期'));$('reference').firstChild.value='';$('dates').replaceChildren();for(const x of d.dates){const o=node('option',x.date);o.value=x.date;$('reference').append(o);$('dates').append(node('span',x.date+' · '+x.leaders+' LED / '+x.images+' IMG · frames '+(x.frames||[]).join(',')+' · '+(x.polarizations||[]).join('/')+(x.leaders&&x.images?'':' · 缺檔')+(x.warnings?.length?' · '+x.warnings.join('；'):''),'chip'));}$('scanSummary').textContent=`找到 ${d.dates.length} 個日期`;window.pairScanned?.(d.dates);if(!d.dates.length)throw Error('找不到 YYMMDD 資料夾；第一版需先解壓縮並按日期整理。');});
+$('createForm').onsubmit=async e=>{e.preventDefault();clear();try{const c={};for(const k of ['name','root','source','env','dem','dem_geo','wbd','reference'])c[k]=$(k).value.trim();c.workflow=window.selectedWorkflow||'alosStack';c.copy=$('copy').checked;c.properties=Object.fromEntries(Object.entries(properties).filter(([k,v])=>v.trim()&&!controlled.includes(k)));if(c.workflow==='alos2App')Object.assign(c,window.pairFormOptions());const s=await api('/api/create',c);current=s.id;reviewLoaded=null;await refresh();}catch(e){fail(e);}};
+function newView(){current=null;reviewLoaded=null;$('setup').hidden=false;$('project').hidden=true;$('crumb').textContent='建立專案';clear();}
+$('newProject').onclick=newView;
+const statusNames={new:'等待準備',ready:'準備完成',running:'執行中',review:'需要判讀',failed:'已停止',complete:'運算完成'};
+statusNames.pair_ready='等待開始干涉';
+function summary(s){$('summary').replaceChildren();const c=s.config;for(const [k,v] of Object.entries({'資料來源':c.source,'資料使用方式':c.copy?'複製與驗證':'直接讀取','參考日期':c.reference,...(c.workflow==='alos2App'?{'比較日期':c.secondary,'frame':c.frames.join('、'),'地理編碼範圍':c.bbox?.join('、')||'使用參考影像範圍'}:{}),'環境':c.env,'對位 DEM':c.dem,'地理編碼 DEM':c.dem_geo,'水體遮罩':c.wbd,...c.properties,...(s.ion?{'本次電離層估計':s.ion.estimate?'啟用':'關閉','本次套用校正':s.ion.estimate&&s.ion.apply?'啟用':'不執行',...(c.workflow==='alos2App'?{}:{'本次一般配對數':s.ion.subsequent,'本次電離層配對數':s.ion.subsequent_ion})}:{}),...Object.fromEntries(Object.entries(s.looks||{}).filter(([k])=>k.includes('lks')).map(([k,v])=>['本次生成 '+k,v]))})){$('summary').append(node('dt',labels[k]||k),node('dd',v));}}
+async function refresh(){const data=await api('/api/state');projects=data.projects;defaults=data.defaults;window.workbenchCatalog?.(data);$('projects').replaceChildren();for(const s of projects){const b=node('button',s.config.name||'未命名專案','nav'+(current===s.id?' active':''));b.onclick=async()=>{current=s.id;reviewLoaded=null;clear();try{await refresh();}catch(e){fail(e);}};$('projects').append(b);}if(!current)return;const s=projects.find(x=>x.id===current);if(!s)return;$('setup').hidden=true;$('project').hidden=false;$('crumb').textContent=s.config.name;$('projectName').textContent=s.config.name;$('projectPath').textContent=s.config.root;$('status').textContent=statusNames[s.status];$('stage').textContent=s.stage;$('error').textContent=s.error||'';summary(s);$('history').replaceChildren();for(const h of s.history)$('history').append(node('p',h.time+' · '+h.stage,'hint'));if(s.config.workflow==='alos2App'){await window.pairUpdate(s,data);await refreshLog();return;}if($('pairWorkbench'))$('pairWorkbench').hidden=true;$('timeline').replaceChildren();['準備專案','跑到檢查點','人工判讀','後半段'].forEach((x,i)=>$('timeline').append(node('div',`${i+1}  ${x}`,s.status==='review'&&i===2?'selected':'')));$('actions').replaceChildren();const add=(text,a)=>{const b=node('button',text,'primary');action(b,async()=>{b.disabled=true;await api('/api/action',{id:current,action:a});await refresh();});$('actions').append(b);};if(s.status==='new')add('確認設定，準備資料與指令','prepare');if(s.status==='ready')add(s.ion?.estimate===false?'開始 cmd1、cmd2、cmd4（跳過電離層）':'開始 cmd1～3，跑到檢查點','run');if(s.status==='running'){const b=node('button','停止工作');action(b,()=>api('/api/stop',{}));$('actions').append(b);}if(s.status==='failed'){if(s.can_retry_prepare){add('重新檢查並準備指令','prepare');$('actions').append(node('p','尚未進入科學運算，可重試準備步驟。','hint'));}else $('actions').append(node('p','已保留日誌與現有輸出。請先診斷問題；本版不自動重跑運算階段。','hint'));}$('review').hidden=s.status!=='review';$('continue').textContent=s.ion?.apply===false?'確認判讀，保留估計並跑 cmd4（不套用校正） →':'確認並執行後半段 →';if(s.status==='review'&&reviewLoaded!==current){await renderReview();reviewLoaded=current;}await refreshLog();window.workbenchUpdate?.(s,data);}
+async function refreshLog(){if(!current)return;const d=await api('/api/log?id='+current);const el=$('log'),bottom=el.scrollHeight-el.scrollTop-el.clientHeight<50;el.textContent=d.text;if(bottom)el.scrollTop=el.scrollHeight;}
+async function renderReview(){const d=await api('/api/review?id='+current);$('pairs').replaceChildren();$('looks').replaceChildren();$('reviewed').checked=false;objectURLs.forEach(URL.revokeObjectURL);objectURLs=[];for(const [k,v]of Object.entries(d.options))if(k.includes('lks'))$('looks').append(node('span',k+': '+v,'chip'));for(const pair of d.pairs){const card=node('div',undefined,'pair'),label=node('label',undefined,'check'),check=node('input');check.type='checkbox';check.value=pair;label.append(check,document.createTextNode('排除 '+pair));card.append(label);const images=d.images.filter(x=>x.includes(pair));if(!images.length)card.append(node('p','沒有找到對應圖片，請查看完整檢查輸出。','error'));for(const file of images){const r=await fetch('/api/image?id='+current+'&file='+encodeURIComponent(file),{headers:{'X-Token':token}});if(!r.ok)throw Error('圖片載入失敗');const url=URL.createObjectURL(await r.blob());objectURLs.push(url);const img=node('img');img.src=url;img.alt=pair+' 電離層檢查';img.onclick=()=>{$('largeImage').src=url;$('imageDialog').showModal();};card.append(img);}$('pairs').append(card);}}
+action($('continue'),async()=>{if(!$('reviewed').checked)throw Error('請先檢查圖片並勾選確認。');const excluded=[...$('pairs').querySelectorAll('input:checked')].map(x=>x.value);await api('/api/action',{id:current,action:'continue',excluded});await refresh();});
+$('closeImage').onclick=()=>$('imageDialog').close();action($('refreshLog'),refreshLog);
+(async()=>{try{await refresh();$('env').value=defaults.env;properties=initial();renderProperties();/* Deliberately do not import example geographic paths or dates. */}catch(e){fail(e);}})();
+setInterval(()=>{if(current&&!document.hidden)refresh().catch(fail);},3000);
