@@ -4,6 +4,8 @@ import hashlib
 import json
 import re
 import shlex
+import os
+import shutil
 import xml.etree.ElementTree as ET
 
 LOOKS = ['nrlks1', 'nalks1', 'nrlks2', 'nalks2', 'nrlks_ion', 'nalks_ion']
@@ -11,6 +13,17 @@ PROPERTIES = ['number of range looks 1', 'number of azimuth looks 1',
               'number of range looks 2', 'number of azimuth looks 2',
               'number of range looks ion', 'number of azimuth looks ion']
 PAIR = re.compile(r'^\d{6}-\d{6}$')
+
+def find_conda(prefix):
+    """Resolve a private workbench environment before any shell's Conda."""
+    prefix = Path(prefix).resolve()
+    managed = Path(os.environ.get('SAR_WORKBENCH_HOME', str(Path.home() / 'sar-workbench'))) / 'runtime'
+    candidates = []
+    if managed.resolve() in prefix.parents:
+        candidates.append(managed / 'miniforge/bin/conda')
+    candidates += [prefix.parent.parent / 'bin/conda', Path.home() / 'miniconda3/bin/conda',
+                   Path.home() / 'miniforge3/bin/conda']
+    return next((str(p) for p in candidates if p.is_file()), shutil.which('conda'))
 
 def atomic_json(path, value):
     path = Path(path)

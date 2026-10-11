@@ -20,6 +20,18 @@ def clean_env(cache):
     env.update(MPLBACKEND='Agg',MPLCONFIGDIR=str(cache/'matplotlib'),XDG_CACHE_HOME=str(cache),OMP_NUM_THREADS='2',OPENBLAS_NUM_THREADS='2')
     return env
 
+def failure_detail(log_path):
+    """Keep the actionable scientific validation error visible next to the run."""
+    try:
+        with Path(log_path).open('rb') as f:
+            f.seek(max(0,Path(log_path).stat().st_size-18000))
+            lines=f.read().decode(errors='replace').splitlines()
+        for line in reversed(lines):
+            for marker in ('ValueError: ', 'RuntimeError: ', '分析失敗：'):
+                if marker in line:return line.split(marker,1)[1].strip()[:900]
+    except OSError:pass
+    return ''
+
 class Analyses:
     def __init__(self, engine):self.engine=engine;self.geo_lock=threading.Lock()
     def base(self,key):
@@ -117,7 +129,9 @@ class Analyses:
                 if self.engine.cancel.is_set():os.killpg(process.pid,signal.SIGTERM)
                 code=process.wait()
             job=self.get(key,run)
-            if code or self.engine.cancel.is_set():raise RuntimeError(f'分析停止（結束碼 {code}），請查看分析日誌。已保留輸出，可另建版本。')
+            if code or self.engine.cancel.is_set():
+                detail=failure_detail(p/'run.log') if code and not self.engine.cancel.is_set() else ''
+                raise RuntimeError((detail+'。' if detail else '')+f'分析停止（結束碼 {code}），已保留輸出與日誌，可另建版本。')
             if fingerprint(job['inventory']['files'])!=job['source_fingerprint']:raise RuntimeError('分析期間來源檔案改變，結果不能標示完成。')
             job.update(status='loaded' if mode=='load' else 'complete',stage={'load':'資料已載入，等待確認參考點','invert':'時序分析完成，請檢查品質','quality':'品質檢查完成'}[mode])
         except Exception as e:
@@ -198,7 +212,7 @@ class Analyses:
         names=['inputs/geometryRadar.h5','velocity.h5','temporalCoherence.h5','maskTempCoh.h5'] if mode=='result' else ['inputs/geometryRadar.h5','inputs/ifgramStack.h5']
         stamps=[(n,(p/n).stat().st_size,(p/n).stat().st_mtime_ns) for n in names]
         signature=hashlib.sha256(json.dumps(stamps).encode()).hexdigest()[:12]
-        return j,dict(mode=mode,folder=str(p),out=str(out),prefix='map-v4-'+signature)
+        return j,dict(mode=mode,folder=str(p),out=str(out),prefix='map-v5-'+signature)
 
     def geo_view(self,key,run):
         j,spec=self.geo_spec(key,run);p=Path(spec['out'])/(spec['prefix']+'.json')

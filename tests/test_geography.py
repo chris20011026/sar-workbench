@@ -54,6 +54,17 @@ class GeographyTests(unittest.TestCase):
         with self.assertRaises(ValueError):geo.export({**self.spec,'crs':'EPSG:3857','resolution':100})
         with self.assertRaises(ValueError):geo.export({**self.spec,'resolution':0})
         with self.assertRaises(ValueError):geo.export({**self.spec,'threshold':float('nan')})
+    def test_nonlinear_model_meaning_survives_map_and_geotiff(self):
+        from osgeo import gdal
+        p=self.p/'analysis.json';job=json.loads(p.read_text())
+        job['options']['mintpy_overrides']={'mintpy.timeFunc.periodic':'1'}
+        p.write_text(json.dumps(job))
+        meta=geo.map_view(self.spec)
+        self.assertEqual(meta['velocity_label'],'LOS 模型線性項')
+        out=geo.export({**self.spec,'resolution':100})
+        ds=gdal.Open(str(self.p/'exports'/out['file']))
+        self.assertIn('linear coefficient',ds.GetMetadata()['VELOCITY_MEANING'])
+        self.assertEqual(json.loads(ds.GetMetadata()['TIME_FUNCTION_SETTINGS'])['mintpy.timeFunc.periodic'],'1')
     def test_publication_figure_and_projected_export(self):
         from PIL import Image
         from osgeo import gdal

@@ -1,0 +1,76 @@
+name: Workbench validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Control flow, input guards and browser state tests
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src python -m unittest discover -s tests -v
+          for source in src/alosstack_helper/static/*.js; do node --check "$source"; done
+          node tests/test_ui_resilience.cjs
+
+  fresh-mac-install:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build native launcher
+        run: |
+          test "$(uname -m)" = arm64
+          python tools/build_macos_app.py --output "$RUNNER_TEMP/release"
+      - name: Bootstrap with only macOS tools on PATH
+        run: |
+          env -i HOME="$HOME" USER="$USER" TMPDIR="$RUNNER_TEMP" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
+            "$RUNNER_TEMP/release/SAR Workbench.app/Contents/MacOS/SARWorkbench" \
+            --bootstrap-only --home "$RUNNER_TEMP/workbench"
+      - name: Create and validate a fresh scientific environment
+        run: |
+          PYTHONDONTWRITEBYTECODE=1 \
+          PYTHONPATH="$RUNNER_TEMP/release/SAR Workbench.app/Contents/Resources/workbench/src" \
+            "$RUNNER_TEMP/workbench/runtime/miniforge/bin/python" -m alosstack_helper.runtime \
+            --home "$RUNNER_TEMP/workbench" --install
+      - name: Check shipped server and scientific adapters
+        run: |
+          PREFIX=$("$RUNNER_TEMP/workbench/runtime/miniforge/bin/python" -c 'import json,sys; print(json.load(open(sys.argv[1]))["prefix"])' "$RUNNER_TEMP/workbench/runtime/ready.json")
+          SAR_WORKBENCH_HOME="$RUNNER_TEMP/workbench" CONDA_NUMBER_CHANNEL_NOTICES=0 \
+            "$RUNNER_TEMP/workbench/runtime/miniforge/bin/conda" run --no-capture-output -p "$PREFIX" \
+            python tools/check_release.py --home "$RUNNER_TEMP/workbench" \
+            --bundled-source "$RUNNER_TEMP/release/SAR Workbench.app/Contents/Resources/workbench/src"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-arm-validation
+          path: |
+            ${{ runner.temp }}/workbench/runtime/reports/
+            ${{ runner.temp }}/workbench/runtime/workbench-validation.json
+            ${{ runner.temp }}/workbench/runtime/install-state.json
+            ${{ runner.temp }}/workbench/runtime/install-*.log
+            ${{ runner.temp }}/workbench/runtime/bootstrap.log
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mac-arm-app
+          path: |
+            ${{ runner.temp }}/release/SAR-Workbench-*.zip
+            ${{ runner.temp }}/release/SHA256SUMS

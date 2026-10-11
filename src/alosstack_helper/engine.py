@@ -10,7 +10,7 @@ import threading
 import time
 import uuid
 
-from .core import (LOOKS, PAIR, atomic_json, declared_pairs, digest, inspect_data, parse_cmd3,
+from .core import (LOOKS, PAIR, atomic_json, declared_pairs, digest, inspect_data, parse_cmd3, find_conda,
                    safe_path, split_pre_review, validate_network, write_xml)
 from .inputs import prepare_raster
 
@@ -89,12 +89,7 @@ class Engine:
         stack = Path(c['env'], 'share/isce2/alosStack')
         if not (stack / 'create_cmds.py').is_file():
             raise ValueError('此環境找不到 share/isce2/alosStack。')
-        conda = shutil.which('conda')
-        # Also support launches outside an activated Conda shell.
-        if not conda:
-            for base in [Path(c['env']).parent.parent, Path.home()/'miniconda3', Path.home()/'miniforge3']:
-                if (base / 'bin/conda').is_file():
-                    conda = str(base / 'bin/conda'); break
+        conda = find_conda(c['env'])
         if not conda:
             raise ValueError('找不到 conda；請从可使用 conda 的終端機啟動本工具。')
         c.update(root=str(root), data=str(root / 'data') if c.get('copy') else c['source'], conda=conda)

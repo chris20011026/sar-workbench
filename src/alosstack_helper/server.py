@@ -7,6 +7,9 @@ import mimetypes
 import os
 import secrets
 import webbrowser
+import signal
+import threading
+import fcntl
 
 from .core import inspect_data, read_template
 from .engine import Engine
@@ -14,14 +17,21 @@ from .native_picker import choose_native
 from .analysis import Analyses
 from .pair import PairWorkflow, FIELDS, import_pair_xml
 from .workflows import WORKFLOWS, inventory
+from .mintpy_parameters import catalogue
+from .onboarding import Onboarding, inspect_terrain
+from .runtime import ready_environment, workbench_home
+from .terrain import plan_terrain
+from .core import atomic_json
 
 STATIC = Path(__file__).parent/'static'
 
 def defaults():
     candidates = [Path(os.environ.get('CONDA_PREFIX', '/nonexistent'))]
+    managed = ready_environment()
+    if managed: candidates.insert(0, managed)
     for base in [Path.home()/'miniconda3', Path.home()/'miniforge3', Path('/opt/miniconda3')]:
         if (base/'envs').is_dir(): candidates.extend((base/'envs').iterdir())
-    candidates = sorted(set(candidates), key=lambda p: (p.name != 'insar_arm', str(p)))
+    candidates = sorted(set(candidates), key=lambda p: (p != managed, p.name != 'insar_arm', str(p)))
     env = next((p for p in candidates if (p/'share/isce2/alosStack/create_cmds.py').is_file()), None)
     return {'home':str(Path.home()), 'env':str(env) if env else '',
             'template':str(env/'share/isce2/alosStack/alosStack.xml') if env else '',
@@ -30,6 +40,7 @@ def defaults():
 def make_server(engine, port=8765):
     token = secrets.token_urlsafe(32)
     analyses = Analyses(engine)
+    onboarding = Onboarding()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
         def send(self, value, status=200, mime='application/json'):
@@ -50,16 +61,21 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workbench.js', '/maps.js', '/pair.js', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
                     data = (STATIC/name).read_bytes()
-                    if name == 'index.html': data = data.replace(b'__TOKEN__', token.encode())
+                    if name == 'index.html':
+                        data = data.replace(b'__ONBOARDING__', (STATIC/'onboarding-panel.html').read_bytes())
+                        data = data.replace(b'__TOKEN__', token.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
+                if u.path == '/api/onboarding': return self.send(dict(onboarding.runtime.status(), jobs=onboarding.recent()))
+                if u.path == '/api/onboarding-job': return self.send(onboarding.job(q.get('job', [''])[0]))
                 if u.path == '/api/state': return self.send({'projects':engine.list(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active)})
                 if u.path == '/api/pair-schema':return self.send({'fields':FIELDS})
+                if u.path == '/api/mintpy-schema':return self.send(catalogue(q.get('environment',[None])[0] or None))
                 if u.path == '/api/browse':
                     p = Path(q.get('path',[str(Path.home())])[0]).expanduser().resolve()
                     entries = []
@@ -90,7 +106,7 @@ def make_server(engine, port=8765):
                     p=analyses.survey_artifact(key,q['file'][0])
                     return self.send(p.read_bytes(),mime='application/octet-stream')
 
-                if u.path == '/api/log':
+                if u.path in ('/api/project-output', '/api/log'):
                     p = meta/'run.log'
                     if p.exists():
                         with p.open('rb') as f:
@@ -111,6 +127,23 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/setup-start':
+                    if engine.active: raise ValueError('請等待目前的研究運算結束，再進行安裝或驗證。')
+                    if any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先完成目前的資料準備或教學工作。')
+                    return self.send(onboarding.runtime.start(consent=d.get('consent') is True, recheck=d.get('recheck') is True))
+                if self.path == '/api/setup-stop': onboarding.runtime.stop(); return self.send({'ok':True})
+                if self.path == '/api/import-scan': return self.send(onboarding.scan(d['path']))
+                if self.path == '/api/import-start': return self.send(onboarding.start_job('import', d.get('plan')))
+                if self.path == '/api/onboarding-stop': onboarding.stop(); return self.send({'ok':True})
+                if self.path == '/api/demo-start':
+                    if engine.active: raise ValueError('請先完成目前的研究運算，再開始教學範例。')
+                    return self.send(onboarding.start_job('demo'))
+                if self.path == '/api/terrain-check': return self.send(inspect_terrain(d['path'], d['kind']))
+                if self.path == '/api/terrain-plan': return self.send(plan_terrain(d.get('bounds')))
+                if self.path == '/api/terrain-start':
+                    if engine.active: raise ValueError('請先完成目前的研究運算。')
+                    return self.send(onboarding.start_job('terrain', options=d))
                 if self.path == '/api/pick': return self.send(choose_native(d.get('mode'), d.get('start')))
                 if self.path == '/api/pair-template':return self.send(import_pair_xml(d['path']))
                 if self.path == '/api/template': return self.send({'properties':read_template(d['path'])})
@@ -130,19 +163,43 @@ def make_server(engine, port=8765):
                 if self.path == '/api/stop': engine.stop(); return self.send({'ok':True})
                 return self.send({'error':'Not found'},404)
             except Exception as e: self.send({'error':str(e)},400)
-    return ThreadingHTTPServer(('127.0.0.1',port),Handler)
+    server = ThreadingHTTPServer(('127.0.0.1',port),Handler)
+    server.onboarding = onboarding
+    return server
 
 def main():
     parser=argparse.ArgumentParser(description='alosStack visual workbench (local only)')
     parser.add_argument('--port',type=int,default=8765)
     parser.add_argument('--state-dir',default=str(Path.home()/'.local/share/alosstack-helper'))
     parser.add_argument('--no-browser',action='store_true')
+    parser.add_argument('--desktop-session', type=Path, help=argparse.SUPPRESS)
     args=parser.parse_args()
-    server=make_server(Engine(args.state_dir),args.port)
+    # A second server must never reconcile or mutate the same project registry.
+    state_dir = Path(args.state_dir).expanduser()
+    state_dir.mkdir(parents=True, exist_ok=True)
+    guard = (state_dir / 'server.lock').open('a')
+    try: fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError: parser.exit(1, '這個工作台已經在執行；請開啟原本的瀏覽器頁面。\n')
+    engine = Engine(args.state_dir)
+    server=make_server(engine,args.port)
     url=f'http://127.0.0.1:{server.server_port}'
     print('alosStack Helper: '+url,flush=True)
+    if args.desktop_session:
+        atomic_json(args.desktop_session, {'url':url, 'pid':os.getpid()})
     if not args.no_browser: webbrowser.open(url)
+    def shutdown(*_):
+        server.onboarding.runtime.stop()
+        server.onboarding.stop()
+        if engine.active: engine.stop()
+        threading.Thread(target=server.shutdown, daemon=True).start()
+    signal.signal(signal.SIGTERM, shutdown)
     try: server.serve_forever()
-    except KeyboardInterrupt: server.server_close()
+    except KeyboardInterrupt: pass
+    finally:
+        server.onboarding.runtime.stop()
+        server.onboarding.stop()
+        if engine.active: engine.stop()
+        server.server_close()
+        guard.close()
 
 if __name__ == '__main__': main()

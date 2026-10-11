@@ -5,6 +5,7 @@ import math
 import re
 import xml.etree.ElementTree as ET
 from .core import validate_network
+from .mintpy_parameters import normalize_overrides
 
 WORKFLOWS = [
     dict(id='alosStack', name='ALOS-2 · 多日期', tool='alosStack', available=True, description='資料準備 → 電離層判讀 → 解纏 → MintPy'),
@@ -95,7 +96,7 @@ def options(data, inv):
     memory=float(data.get('memory',2));threshold=float(data.get('temporal_coherence',.7));minref=float(data.get('reference_coherence',.85))
     if not .5<=memory<=32 or not 0<=threshold<=1 or not 0<=minref<=1:raise ValueError('記憶體或相干性設定超出範圍。')
     deramp=data.get('deramp','no')
-    if deramp not in ['no','linear','quadratic']:raise ValueError('不支援的軌道坡度設定。')
+    if deramp not in ['no','linear','linear_range','linear_azimuth','quadratic','quadratic_range','quadratic_azimuth']:raise ValueError('不支援的空間坡度設定。')
     subset=data.get('subset') or None
     lalo=data.get('subset_lalo') or None
     if lalo:
@@ -112,4 +113,5 @@ def options(data, inv):
     if order not in (1,2) or (data.get('dem_error') and len(retained)<order+3):raise ValueError('DEM 誤差模型所需日期數不足。')
     name=str(data.get('name','')).strip()
     if len(name)>100:raise ValueError('分析名稱請限制在 100 字內。')
-    return dict(name=name,excluded=excluded,manual_excluded=manual,excluded_dates=excluded_dates,start_date=start,end_date=end,retained_dates=retained,used=used,reference_date=ref,memory=memory,temporal_coherence=threshold,reference_coherence=minref,deramp=deramp,dem_error=bool(data.get('dem_error',False)),dem_order=order,weight=weight,redundancy=redundancy,subset=subset,subset_lalo=lalo)
+    overrides=normalize_overrides(data.get('mintpy_overrides',{}),retained_dates=retained)
+    return dict(name=name,excluded=excluded,manual_excluded=manual,excluded_dates=excluded_dates,start_date=start,end_date=end,retained_dates=retained,used=used,reference_date=ref,memory=memory,temporal_coherence=threshold,reference_coherence=minref,deramp=deramp,dem_error=bool(data.get('dem_error',False)),dem_order=order,weight=weight,redundancy=redundancy,subset=subset,subset_lalo=lalo,mintpy_overrides=overrides)

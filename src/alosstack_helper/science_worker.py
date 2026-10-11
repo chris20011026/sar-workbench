@@ -3,6 +3,12 @@ import os,sys,json,shutil,time,math,importlib.metadata
 from pathlib import Path
 import xml.etree.ElementTree as ET
 import numpy as np
+try:
+    from . import mintpy_runtime as runtime
+    from .mintpy_parameters import normalize_overrides
+except ImportError:
+    import mintpy_runtime as runtime
+    from mintpy_parameters import normalize_overrides
 
 
 def save(path,data):
@@ -102,7 +108,10 @@ def make_template(job_path,src):
     for key,ext in [('demFile','hgt'),('lookupYFile','lat'),('lookupXFile','lon'),('incAngleFile','los'),('azAngleFile','los'),('waterMaskFile','wbd')]:config['mintpy.load.'+key]=str(src/'geometry'/Path(inv['geometry'][ext]).name)
     if o['subset']:
         y0,y1,x0,x1=o['subset'];config['mintpy.subset.yx']=f'{y0}:{y1},{x0}:{x1}'
+    config.update(normalize_overrides(o.get('mintpy_overrides',{}),retained_dates=o.get('retained_dates')))
+    config=runtime.preflight(job_path,config)
     (p/'mintpy.cfg').write_text('\n'.join(f'{k} = {v}' for k,v in config.items())+'\n')
+    runtime.seal_template(job_path)
 
 def date8(s):
     import datetime
@@ -112,7 +121,16 @@ def mintpy_steps(job_path,names):
     from mintpy.cli.smallbaselineApp import main
     p=job_path.parent;os.chdir(p)
     for name in names:
-        step(job_path,'MintPy · '+name);main([str(p/'mintpy.cfg'),'--dostep',name])
+        step(job_path,'MintPy · '+name)
+        try:
+            runtime.before_step(job_path,name)
+            if name=='correct_troposphere':
+                with runtime.offline_weather():main([str(p/'mintpy.cfg'),'--dostep',name])
+            else:main([str(p/'mintpy.cfg'),'--dostep',name])
+            runtime.after_step(job_path,name)
+        except Exception as error:
+            runtime.after_step(job_path,name,error=error)
+            raise
 
 def load(job_path):
     import h5py
@@ -121,11 +139,16 @@ def load(job_path):
     p=job_path.parent;out=p/'exports';out.mkdir(exist_ok=True)
     with h5py.File(p/'inputs/ifgramStack.h5','r') as f:
         dates=[[v.decode() for v in row] for row in f['date'][:]];keep=f['dropIfgram'][:].astype(bool);shape=f['unwrapPhase'].shape[1:];avg=np.zeros(shape);common=np.ones(shape,dtype=bool)
+        config=runtime.validate_loaded(job_path,dates,keep,shape)
         for i in np.flatnonzero(keep):
-            avg+=f['coherence'][i];common&=(f['connectComponent'][i]>0)&(f['unwrapPhase'][i]!=0)
+            phase=f['unwrapPhase'][i];coherence=f['coherence'][i]
+            avg+=coherence;common&=(f['connectComponent'][i]>0)&(phase!=0)&np.isfinite(phase)&np.isfinite(coherence)
+            if config.get('mintpy.networkInversion.maskDataset')=='coherence':common&=coherence>=float(config['mintpy.networkInversion.maskThreshold'])
         avg/=int(keep.sum())
     with h5py.File(p/'inputs/geometryRadar.h5','r') as f:
         land=f['waterMask'][:].astype(bool);common&=land
+    common&=runtime.reference_mask(p,shape,config)
+    avg=runtime.reference_coherence(p,avg,config)
     usable=common&np.isfinite(avg);job=json.loads(job_path.read_text());mincoh=job['options']['reference_coherence']
     if usable.any():
         index=np.argmax(np.where(usable,avg,-1));y,x=np.unravel_index(index,avg.shape);candidate=dict(y=int(y),x=int(x),coherence=float(avg[y,x]))
@@ -147,14 +170,25 @@ def validate_reference(job_path,ref=None):
         keep=f['dropIfgram'][:].astype(bool);phase=f['unwrapPhase'][:,y,x];cc=f['connectComponent'][:,y,x]
         if np.any(~np.isfinite(phase[keep])) or np.any(phase[keep]==0) or np.any(cc[keep]<=0):raise ValueError('參考點不在全部保留配對的有效解纏範圍。')
         if np.mean(f['coherence'][:,y,x][keep])<job['options']['reference_coherence']:raise ValueError('參考點平均相干性低於所設門檻。')
+        if (p/'mintpy.cfg').is_file():
+            config=runtime.resolve_file(p/'mintpy.cfg')
+            if not runtime.reference_mask(p,(loaded['height'],loaded['width']),config)[y,x]:raise ValueError('參考點被本次選擇的原生遮罩排除。')
+            if config.get('mintpy.networkInversion.maskDataset')=='coherence' and np.any(f['coherence'][:,y,x][keep]<float(config['mintpy.networkInversion.maskThreshold'])):raise ValueError('參考點有配對未通過反演相干性遮罩。')
+            custom=config.get('mintpy.reference.coherenceFile')
+            if custom and str(custom)!='avgSpatialCoh.h5':
+                from mintpy.utils import readfile
+                value=float(readfile.read(str(custom),box=(x,y,x+1,y+1),print_msg=False)[0].ravel()[0])
+                if not np.isfinite(value) or value<job['options']['reference_coherence']:raise ValueError('參考點未通過指定相干性影像的門檻。')
     return ref
 
 
 def invert(job_path):
     import h5py
     p=job_path.parent;job=json.loads(job_path.read_text())
+    runtime.validate_external_inputs(job_path)
     ref=validate_reference(job_path,job.get("reference_pixel"));y,x=ref
     with (p/'mintpy.cfg').open('a') as f:f.write(f'mintpy.reference.yx = {y},{x}\n')
+    if job.get('parameter_report'):runtime.seal_template(job_path)
     mintpy_steps(job_path,['reference_point','quick_overview','correct_unwrap_error','invert_network','correct_LOD','correct_SET','correct_ionosphere','correct_troposphere','deramp','correct_topography','residual_RMS','reference_date','velocity'])
     # Reference-date correction edits the selected time series; use MintPy's own output selection.
     from mintpy.smallbaselineApp import TimeSeriesAnalysis
@@ -176,10 +210,13 @@ def invert(job_path):
     finite=vel[mask]
     if not finite.size:raise ValueError('時間相干性遮罩後沒有有效速度像素。')
     lim=float(np.percentile(np.abs(finite),98)) or 1
-    results=dict(preview=preview(vel,mask,out,'velocity.png',[-lim,lim],'RdBu_r'),coherence_preview=preview(coh,np.isfinite(coh),out,'temporal-coherence.png',[0,1]),dates=dates,reference_pixel=ref,reference_date=attrs.get('REF_DATE'),unit='mm/year',direction='正值＝朝向衛星；負值＝遠離衛星。這是相對參考點的 LOS 位移，不是垂直下陷。',valid_pixels=int(mask.sum()),total_pixels=int(mask.size),versions=versions(),settings=job['options'])
+    parameter_report=job.get('parameter_report',{})
+    results=dict(preview=preview(vel,mask,out,'velocity.png',[-lim,lim],'RdBu_r'),coherence_preview=preview(coh,np.isfinite(coh),out,'temporal-coherence.png',[0,1]),dates=dates,reference_pixel=ref,reference_date=attrs.get('REF_DATE'),unit='mm/year',direction='正值＝朝向衛星；負值＝遠離衛星。這是相對參考點的 LOS 位移，不是垂直下陷。',valid_pixels=int(mask.sum()),total_pixels=int(mask.size),versions=versions(),settings=job['options'],parameter_report=parameter_report,velocity_meaning=parameter_report.get('time_model',{}).get('velocity_meaning','LOS 位移的線性擬合速度；相對所選參考點與日期。'))
+    results['velocity_label']='LOS 模型線性項係數' if parameter_report.get('time_model',{}).get('nonlinear') else 'LOS 線性擬合速度'
     save(p/'results.json',results);save(out/'results.json',results)
     # Exports are owned by this analysis; originals remain inside the analysis folder.
     shutil.copy2(p/'mintpy.cfg',out/'mintpy.cfg');shutil.copy2(p/'velocity.h5',out/'velocity.h5')
+    if (p/'parameter-report.json').is_file():shutil.copy2(p/'parameter-report.json',out/'parameter-report.json')
 
 def point_data(job_path,y,x,threshold=0):
     import h5py
@@ -197,7 +234,7 @@ def point_data(job_path,y,x,threshold=0):
     if coh<threshold:raise ValueError('此位置低於目前的顯示門檻。')
     with h5py.File(p/'velocity.h5','r') as f:
         velocity=float(f['velocity'][y,x])*1000;std=float(f['velocityStd'][y,x])*1000 if 'velocityStd' in f else None
-    return dict(y=y,x=x,latitude=lat,longitude=lon,dates=dates,displacement_mm=v.tolist(),unit='mm',velocity=velocity,velocity_std=std if std is not None and np.isfinite(std) else None,temporal_coherence=coh,reference_date=job['options']['reference_date'],analysis_id=job['id'])
+    return dict(y=y,x=x,latitude=lat,longitude=lon,dates=dates,displacement_mm=v.tolist(),unit='mm',velocity=velocity,velocity_std=std if std is not None and np.isfinite(std) else None,temporal_coherence=coh,reference_date=job['options']['reference_date'],analysis_id=job['id'],velocity_meaning=job.get('parameter_report',{}).get('time_model',{}).get('velocity_meaning','LOS 線性擬合速度'))
 
 def point(job_path,y,x):
     print('RESULT:'+json.dumps(point_data(job_path,y,x),allow_nan=False))

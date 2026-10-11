@@ -11,7 +11,20 @@ from pyproj import Transformer
 from pyresample import geometry,kd_tree
 from science_worker import read_raster,save
 
-VERSION=4
+VERSION=5
+
+def model_metadata(folder):
+    """Preserve the scientific meaning of a velocity coefficient in derived outputs."""
+    job=json.loads((Path(folder)/'analysis.json').read_text())
+    cfg=job.get('parameter_report',{}).get('resolved',{})
+    cfg={**job.get('options',{}).get('mintpy_overrides',{}),**cfg}
+    time_settings={k:v for k,v in cfg.items() if k.startswith('mintpy.timeFunc.')}
+    inactive=lambda v: v is None or v is False or str(v).lower() in ('','no','none','auto','false','[]')
+    nonlinear=str(cfg.get('mintpy.timeFunc.polynomial',1)) not in ('1','1.0','auto') or any(not inactive(cfg.get('mintpy.timeFunc.'+k)) for k in ('periodic','stepDate','exp','log'))
+    return dict(velocity_label='LOS 模型線性項' if nonlinear else 'LOS 平均速度',
+                velocity_meaning='linear coefficient of selected time model' if nonlinear else 'linear trend over selected dates',
+                time_function_settings=time_settings,
+                uncertainty_method=str(cfg.get('mintpy.timeFunc.uncertaintyQuantification','residue')))
 
 def valid_geometry(lat,lon):
     return np.isfinite(lat)&np.isfinite(lon)&(np.abs(lat)<85)&(np.abs(lon)<=180)&((lat!=0)|(lon!=0))
@@ -122,6 +135,7 @@ def map_view(spec):
         layers[name]=dict(file=fname,min=float(lo),max=float(max(hi,lo+1e-5)),palette=palette)
     np.savez_compressed(out/(spec['prefix']+'-index.npz'),index=idx,shape=np.array(lat.shape),transform=np.array(meta['transform']))
     meta.update(prefix=spec['prefix'],layers=layers,palettes=palettes,mode=spec['mode'],footprint=perimeter(lat,lon),native_shape=list(lat.shape),threshold=threshold,valid_pixels=int(mask.sum()),land_pixels=int(land.sum()),total_pixels=int(mask.size),reference=None)
+    if spec['mode']=='result':meta.update(model_metadata(spec['folder']))
     if mask.any():
         vlat=lat[mask];vlon=lon[mask];meta['valid_bounds']=[[float(vlat.min()),float(vlon.min())],[float(vlat.max()),float(vlon.max())]]
     if ref:
@@ -170,7 +184,8 @@ def export(spec):
     ds=gdal.GetDriverByName('GTiff').Create(str(dest),meta['width'],meta['height'],1,gdal.GDT_Float32,options=['COMPRESS=DEFLATE','TILED=YES'])
     ds.SetGeoTransform(meta['transform']);sr=osr.SpatialReference();sr.ImportFromEPSG(int(crs.split(':')[1]));ds.SetProjection(sr.ExportToWkt())
     band=ds.GetRasterBand(1);band.SetNoDataValue(float('nan'));band.WriteArray(values);band.SetUnitType('1' if name=='coherence' else 'mm/year')
-    ds.SetMetadata({'SOURCE_ANALYSIS':Path(spec['folder']).name,'RESAMPLING':'nearest source pixel','DISPLAY_TEMPORAL_COHERENCE':str(threshold),'REFERENCE':'same spatial and temporal reference as source velocity.h5','UNIT':'1' if name=='coherence' else 'mm/year'});ds.FlushCache();ds=None
+    model=model_metadata(spec['folder'])
+    ds.SetMetadata({'SOURCE_ANALYSIS':Path(spec['folder']).name,'RESAMPLING':'nearest source pixel','DISPLAY_TEMPORAL_COHERENCE':str(threshold),'REFERENCE':'same spatial and temporal reference as source velocity.h5','UNIT':'1' if name=='coherence' else 'mm/year','VELOCITY_MEANING':model['velocity_meaning'],'TIME_FUNCTION_SETTINGS':json.dumps(model['time_function_settings'],ensure_ascii=True),'UNCERTAINTY_METHOD':model['uncertainty_method']});ds.FlushCache();ds=None
     return dict(file=filename,width=meta['width'],height=meta['height'],crs=crs,resolution=resolution)
 
 def figure(spec):
@@ -188,6 +203,7 @@ def figure(spec):
     fig,ax=plt.subplots(figsize=(8,7));status=arrays['status'].copy();status[(status==4)&(arrays['coherence']<threshold)]=3
     if 'height' in arrays:ax.imshow(np.ma.masked_where(~np.isfinite(status)|(status==1),arrays['height']),extent=extent,cmap='Greys',alpha=.25,interpolation='nearest')
     titles={'velocity':'LOS velocity (mm/year)','uncertainty':'Velocity standard deviation (mm/year)','coherence':'Temporal coherence','status':'Quality mask'}
+    if meta.get('velocity_meaning')=='linear coefficient of selected time model':titles['velocity']='LOS model linear coefficient (mm/year)'
     if name=='status':
         cmap=ListedColormap(['#4289b9','#a5a09b','#e7ab3d','#277450']);im=ax.imshow(np.ma.masked_invalid(status),extent=extent,cmap=cmap,norm=BoundaryNorm([.5,1.5,2.5,3.5,4.5],4),interpolation='nearest');bar=fig.colorbar(im,ax=ax,shrink=.7,ticks=[1,2,3,4]);bar.ax.set_yticklabels(['Water','Other mask / no solution','Low temporal coherence','Valid'])
     else:

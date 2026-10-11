@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from alosstack_helper.core import write_xml, parse_cmd3, split_pre_review, declared_pairs
+from alosstack_helper.core import write_xml, parse_cmd3, split_pre_review, declared_pairs, find_conda
 from alosstack_helper.engine import Engine, RESOLVE_CONFIG_SCRIPT
 
 @unittest.skipUnless(os.environ.get('ALOSSTACK_TEST_ENV'), 'Set ALOSSTACK_TEST_ENV to test an installed ISCE2')
@@ -17,7 +17,7 @@ class InstalledGeneratorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='alos-runner-') as tmp:
             root=Path(tmp);(root/'proc').mkdir();(root/'.helper').mkdir()
             engine=Engine(root/'registry')
-            state={'config':{'root':str(root),'env':str(env),'conda':str(env.parent.parent/'bin/conda')}}
+            state={'config':{'root':str(root),'env':str(env),'conda':str(find_conda(env))}}
             engine.run(state,['python','-c','import json,os,shutil; json.dump(dict(mdx=shutil.which("mdx"),isce_home=os.environ["ISCE_HOME"],python=shutil.which("python")),open("tools.json","w"))'],conda=True)
             result=json.loads((root/'proc/tools.json').read_text())
             plotting=Path(__file__).resolve().parents[1]/'.runtime/bin/mdx'
@@ -26,7 +26,7 @@ class InstalledGeneratorTest(unittest.TestCase):
             self.assertEqual(result['python'],str(env/'bin/python'))
     def test_shebang_uses_selected_python_when_environment_already_active(self):
         env=Path(os.environ['ALOSSTACK_TEST_ENV'])
-        conda=env.parent.parent/'bin/conda'
+        conda=find_conda(env)
         # Obtain real activation state, then emulate a launcher prepending Python.
         activated=subprocess.run([str(conda),'run','-p',str(env),str(env/'bin/python'),
             '-c','import os,json; print(json.dumps(dict(os.environ)))'],
@@ -48,7 +48,7 @@ class InstalledGeneratorTest(unittest.TestCase):
             self.assertEqual(Path(json.loads((root/'proc/python.json').read_text())['prefix']).resolve(),env.resolve())
 
     def test_real_generator_adapter(self):
-        env=Path(os.environ['ALOSSTACK_TEST_ENV']);conda=env.parent.parent/'bin/conda'
+        env=Path(os.environ['ALOSSTACK_TEST_ENV']);conda=find_conda(env)
         with tempfile.TemporaryDirectory(prefix='alos-generator-') as tmp:
             base=Path(tmp).resolve();data=base/'data';data.mkdir()
             for date in ['150206','151113','160219']:

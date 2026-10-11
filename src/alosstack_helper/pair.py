@@ -160,7 +160,8 @@ class PairWorkflow:
             if not f.is_file() or not Path(str(f)+'.xml').is_file():raise ValueError(key+' 需有 raster 本體與同名 XML。')
             files.extend([f,Path(str(f)+'.xml')])
             if Path(str(f)+'.vrt').exists():files.append(Path(str(f)+'.vrt'))
-        conda=next((str(p/'bin/conda') for p in [Path(c['env']).parent.parent,Path.home()/'miniconda3',Path.home()/'miniforge3'] if (p/'bin/conda').is_file()),shutil.which('conda'))
+        from .core import find_conda
+        conda=find_conda(c['env'])
         if not conda:raise ValueError('找不到 Conda。')
         c['name']=str(c.get('name','ALOS-2 雙日期')).strip()[:100]
         c.update(root=str(root),data=str(root/'data') if c.get('copy') else c['source'],conda=conda)

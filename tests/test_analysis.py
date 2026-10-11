@@ -53,6 +53,32 @@ class AnalysisTests(unittest.TestCase):
             with self.subTest(d=d),self.assertRaises(ValueError):options(d,inv)
         o=options({'subset_lalo':[24,25,121,122],'weight':'coh','redundancy':1.5},inv)
         self.assertEqual(o['weight'],'coh');self.assertEqual(o['subset_lalo'],[24,25,121,122])
+    def test_mintpy_override_settings_are_persisted_per_run(self):
+        raw={'mintpy.unwrapError.method':'phase_closure','mintpy.networkInversion.minNumPixel':12}
+        with patch('threading.Thread.start'):
+            job=self.a.create('test','mintpy',{'mintpy_overrides':raw})
+        saved=self.a.get('test',job['id'])['options']['mintpy_overrides']
+        self.assertEqual(saved['mintpy.unwrapError.method'],'phase_closure')
+        self.assertEqual(str(saved['mintpy.networkInversion.minNumPixel']),'12')
+        raw['mintpy.unwrapError.method']='no'
+        self.assertEqual(self.a.get('test',job['id'])['options']['mintpy_overrides']['mintpy.unwrapError.method'],'phase_closure')
+        self.assertEqual(self.e.get('test')['status'],'complete')
+    def test_protected_or_injected_mintpy_overrides_fail_before_creating_run(self):
+        for raw in [{'mintpy.load.processor':'snap'}, {'mintpy.reference.date':'20200101'},
+                    {'mintpy.timeFunc.periodic':'1\nmintpy.load.processor = snap'},
+                    {'mintpy.unknown':'auto'}, {'mintpy.networkInversion.minNumPixel':float('nan')}]:
+            with self.subTest(raw=raw),self.assertRaises(ValueError):
+                self.a.create('test','mintpy',{'mintpy_overrides':raw})
+        self.assertFalse(self.a.base('test').exists())
+        self.assertIsNone(self.e.active)
+    def test_missing_overrides_keep_existing_defaults(self):
+        result=options({},inventory(self.s))
+        self.assertEqual(result['mintpy_overrides'],{})
+        self.assertEqual(result['deramp'],'no');self.assertFalse(result['dem_error'])
+    def test_scientific_error_is_visible_without_reading_full_traceback(self):
+        from alosstack_helper.analysis import failure_detail
+        p=self.p/'science.log';p.write_text('Traceback\nValueError: 日期數不足以估計季節模型\nERROR conda failed\n')
+        self.assertEqual(failure_detail(p),'日期數不足以估計季節模型')
     def test_date_exclusion_recomputes_required_network_and_reference(self):
         inv=inventory(self.s);inv['pairs'].extend([{'pair':'190518-200516'},{'pair':'181103-200516'}]);inv['network']=network([p['pair'] for p in inv['pairs']])
         o=options({'excluded_dates':['170826']},inv)
@@ -111,6 +137,19 @@ class AnalysisTests(unittest.TestCase):
         self.assertEqual(self.a.get('test',j['id'])['status'],'failed');self.assertEqual(self.e.get('test')['status'],'complete');self.assertIsNone(self.e.active)
     def test_unsupported_workflow_rejected(self):
         with self.assertRaisesRegex(ValueError,'尚未開放'):self.e.create({'workflow':'topsStack'})
+    def test_project_output_alias_keeps_log_authentication_and_content(self):
+        (self.root/'.helper/run.log').write_text('已完成，原成果保留。\n')
+        server=make_server(self.e,0);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        base=f'http://127.0.0.1:{server.server_port}'
+        try:
+            page=urllib.request.urlopen(base).read().decode();token=re.search('name="api-token" content="([^"]+)"',page)[1]
+            for route in ('/api/project-output','/api/log'):
+                with self.subTest(route=route):
+                    with self.assertRaises(urllib.error.HTTPError) as denied:urllib.request.urlopen(base+route+'?id=test')
+                    self.assertEqual(denied.exception.code,403)
+                    request=urllib.request.Request(base+route+'?id=test',headers={'X-Token':token})
+                    self.assertEqual(json.load(urllib.request.urlopen(request)),{'text':'已完成，原成果保留。\n'})
+        finally:server.shutdown();server.server_close();thread.join()
     def test_api_requires_token_before_accessing_results(self):
         server=make_server(self.e,0);t=threading.Thread(target=server.serve_forever,daemon=True);t.start();base=f'http://127.0.0.1:{server.server_port}'
         try:
@@ -118,6 +157,11 @@ class AnalysisTests(unittest.TestCase):
             self.assertEqual(caught.exception.code,403)
             page=urllib.request.urlopen(base).read().decode();token=re.search('name="api-token" content="([^"]+)"',page)[1]
             req=urllib.request.Request(base+'/api/analyses?id=test',headers={'X-Token':token});self.assertEqual(json.load(urllib.request.urlopen(req)),{'runs':[]})
+            with self.assertRaises(urllib.error.HTTPError) as denied:urllib.request.urlopen(base+'/api/mintpy-schema')
+            self.assertEqual(denied.exception.code,403)
+            req=urllib.request.Request(base+'/api/mintpy-schema',headers={'X-Token':token})
+            schema=json.load(urllib.request.urlopen(req));self.assertEqual(len(schema['options']),121)
+            self.assertEqual(len({r['key'] for r in schema['options']}),121)
         finally:server.shutdown();server.server_close();t.join()
 
 if __name__=='__main__':unittest.main()

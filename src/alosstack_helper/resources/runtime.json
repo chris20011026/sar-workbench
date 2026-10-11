@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "runtime_version": "0.2.0b1",
+  "platform": "osx-arm64",
+  "minimum_macos": "14.5",
+  "miniforge": {
+    "version": "26.7.2-0",
+    "url": "https://github.com/conda-forge/miniforge/releases/download/26.7.2-0/Miniforge3-26.7.2-0-MacOSX-arm64.sh",
+    "sha256": "d70bfa2e97afcda96927c9b9ca0e2316cb7750e4ce651c94388267cbe9588711"
+  },
+  "lock": {
+    "name": "insar-arm-0.2.0b1-osx-arm64.lock",
+    "sha256": "7db65317787e5a6abac25e22ae4d9ff15f3e19c332d696a78243dae1ef56e381"
+  },
+  "source_url": "https://github.com/chris20011026/insar-arm/releases/tag/v0.2.0-beta.1"
+}

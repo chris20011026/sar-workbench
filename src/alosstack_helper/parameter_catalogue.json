@@ -1,0 +1,4397 @@
+{
+  "metadata": {
+    "version": "1.6.4.post3",
+    "bundled_version": "1.6.4.post3",
+    "audited_date": "2026-10-12",
+    "template_sha256": "431c83948793366945ed79cdc24968df878405e92faee6fa7798bc2b385eaef0",
+    "auto_template_sha256": "8791c9e0b7679540e4011e9f9450d1b30811f4dae25376b5cf65fe52eeab803a",
+    "scope": "smallbaselineApp 主流程 121 項；不含所有獨立 CLI 參數。",
+    "auto_note": "空白沿用工作台基準；auto 使用選定 MintPy 的預設，並非關閉。",
+    "count": 121,
+    "groups": [
+      {
+        "id": "compute",
+        "label": "運算資源",
+        "help": "記憶體與平行工作控制速度、峰值資源及部署方式，不是精度旋鈕。工作數增加可能同時增加記憶體與磁碟競爭。叢集必須另有排程服務。",
+        "sources": [
+          {
+            "title": "MintPy 官方主流程說明",
+            "url": "https://mintpy.readthedocs.io/en/latest/"
+          }
+        ]
+      },
+      {
+        "id": "load",
+        "label": "資料載入",
+        "help": "選擇處理器與資料來源。路徑欄位沒有演算法上的優劣；關鍵是日期、單位、網格與校正沿革相符。現有工作台只接收完成的 alosStack 專案。",
+        "sources": [
+          {
+            "title": "MintPy 官方主流程說明",
+            "url": "https://mintpy.readthedocs.io/en/latest/"
+          }
+        ]
+      },
+      {
+        "id": "subset",
+        "label": "研究範圍",
+        "help": "較小範圍節省運算，但可能排除參考區或改變後續背景估計。地圖縮放不等於資料裁切；地理框轉雷達框後應預覽真正邊界。",
+        "sources": [
+          {
+            "title": "MintPy 官方主流程說明",
+            "url": "https://mintpy.readthedocs.io/en/latest/"
+          }
+        ]
+      },
+      {
+        "id": "multilook",
+        "label": "載入時降採樣",
+        "help": "nearest 保留被抽中的像素；mean／median 可降低部分噪聲，但會改變解析度，也可能破壞解纏錯誤的整周關係。不得把平滑當成新增資訊。",
+        "sources": [
+          {
+            "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+            "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+          }
+        ]
+      },
+      {
+        "id": "network",
+        "label": "干涉配對網路",
+        "help": "篩選可減少低品質配對，但過嚴會失去連通與冗餘。MST 保留連通骨架，並不保證骨架內每個配對品質良好。",
+        "sources": [
+          {
+            "title": "Berardino et al. (2002)：小基線時序方法",
+            "url": "https://doi.org/10.1109/TGRS.2002.803792"
+          },
+          {
+            "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+            "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+          }
+        ]
+      },
+      {
+        "id": "reference",
+        "label": "空間與時間參考",
+        "help": "選擇相對位移的基準。高相干不代表不動；參考區宜有外部穩定性證據，並考慮與研究區的距離及高程差。",
+        "sources": [
+          {
+            "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+            "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+          },
+          {
+            "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+            "url": "https://doi.org/10.1002/2015JB012419"
+          }
+        ]
+      },
+      {
+        "id": "unwrapError",
+        "label": "解纏錯誤修正",
+        "help": "bridging 適合狹窄失相干帶兩側的可靠區；phase_closure 依靠冗餘網路與錯誤稀疏性。兩者都需要輸入品質與校正前後檢查。",
+        "sources": [
+          {
+            "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+            "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+          }
+        ]
+      },
+      {
+        "id": "networkInversion",
+        "label": "網路反演與品質遮罩",
+        "help": "加權可降低低品質觀測的影響，但依賴相干性與噪聲模型。時間相干性量測內部一致性，不能取代外部驗證；非過定網路中它可能失去判別力。",
+        "sources": [
+          {
+            "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+            "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+          },
+          {
+            "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+            "url": "https://doi.org/10.1002/2014JB011271"
+          }
+        ]
+      },
+      {
+        "id": "solidEarthTides",
+        "label": "固體潮",
+        "help": "這是有物理來源的位移改正；需要正確觀測時間、位置及依賴套件。是否影響研究結論，應用改正量與目標訊號尺度評估。",
+        "sources": [
+          {
+            "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+            "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+          }
+        ]
+      },
+      {
+        "id": "ionosphericDelay",
+        "label": "電離層",
+        "help": "L 波段需重視電離層延遲。MintPy 此處需額外 split-spectrum 產物；若上游已扣除同一改正，再扣一次會造成錯誤。後者是資料沿革與數學上的檢查原則。",
+        "sources": [
+          {
+            "title": "Liang et al. (2018)：ALOS-2 L 波段時序",
+            "url": "https://doi.org/10.1109/TGRS.2018.2821150"
+          },
+          {
+            "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+            "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+          }
+        ]
+      },
+      {
+        "id": "troposphericDelay",
+        "label": "對流層",
+        "help": "PyAPS 使用氣象模型；高程相關法依觀測擬合；GACOS／OPERA 讀取外部產品。沒有在所有地區均最佳的方法，須比較覆蓋、殘差及對真實訊號的影響。",
+        "sources": [
+          {
+            "title": "Doin et al. (2009)：分層對流層延遲",
+            "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+          },
+          {
+            "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+            "url": "https://doi.org/10.1002/2013JB010588"
+          },
+          {
+            "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+            "url": "https://doi.org/10.1002/qj.3803"
+          },
+          {
+            "title": "Yu et al. (2018)：GACOS 方法",
+            "url": "https://doi.org/10.1029/2017JB015305"
+          }
+        ]
+      },
+      {
+        "id": "deramp",
+        "label": "空間斜坡移除",
+        "help": "可移除廣域背景，但亦可能扣掉真實長波長變形。應讓研究者選擇估計遮罩並比較處理前後，而非預設二次一定較好。",
+        "sources": [
+          {
+            "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+            "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+          },
+          {
+            "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+            "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+          }
+        ]
+      },
+      {
+        "id": "topographicResidual",
+        "label": "DEM 殘餘誤差",
+        "help": "利用基線隨時間的變化分離地形誤差；不合適的變形時間模型可能與 DEM 誤差混淆。足夠日期數仍不等於可辨識，應檢查模型矩陣。",
+        "sources": [
+          {
+            "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+            "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+          }
+        ]
+      },
+      {
+        "id": "residualRMS",
+        "label": "殘差與異常日期",
+        "help": "用殘差協助識別可疑日期，仍需回看該期影像與事件。高殘差可能來自噪聲，也可能反映模型未涵蓋的真實變形。",
+        "sources": [
+          {
+            "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+            "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+          },
+          {
+            "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+            "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+          }
+        ]
+      },
+      {
+        "id": "timeFunc",
+        "label": "速度、時間模型與不確定度",
+        "help": "模型應對應研究假說與取樣日期。線性適合概括趨勢，週期／跳變／衰減增加表達能力，也消耗自由度。殘差標準差不是所有系統誤差的總和。",
+        "sources": [
+          {
+            "title": "Hetland et al. (2012)：時間函數建模",
+            "url": "https://doi.org/10.1029/2011JB008731"
+          },
+          {
+            "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+            "url": "https://doi.org/10.1002/2015JB012419"
+          },
+          {
+            "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+            "url": "https://doi.org/10.1002/2014JB011271"
+          },
+          {
+            "title": "MintPy 時間模型與參數計數原始碼",
+            "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+          }
+        ]
+      },
+      {
+        "id": "geocode",
+        "label": "地理編碼",
+        "help": "把雷達座標成果映射到地理網格；更細輸出像素不代表更高原始解析度。工作台目前另有自己的地圖與 GeoTIFF 匯出，不能與這組原生參數混為一談。",
+        "sources": [
+          {
+            "title": "MintPy 官方主流程說明",
+            "url": "https://mintpy.readthedocs.io/en/latest/"
+          },
+          {
+            "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+            "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+          }
+        ]
+      },
+      {
+        "id": "save",
+        "label": "成果格式",
+        "help": "KMZ 適合瀏覽分享，HDF-EOS5 適合保存有結構的時序成果。輸出格式改變不會提升反演品質。",
+        "sources": [
+          {
+            "title": "MintPy 官方主流程說明",
+            "url": "https://mintpy.readthedocs.io/en/latest/"
+          }
+        ]
+      },
+      {
+        "id": "plot",
+        "label": "批次繪圖",
+        "help": "DPI、記憶體與繪圖開關控制圖片產製；這是 MintPy 原生批次圖，不等於工作台的互動地圖與曲線。",
+        "sources": [
+          {
+            "title": "MintPy 官方主流程說明",
+            "url": "https://mintpy.readthedocs.io/en/latest/"
+          }
+        ]
+      }
+    ]
+  },
+  "options": [
+    {
+      "key": "mintpy.compute.maxMemory",
+      "label": "運算記憶體上限",
+      "purpose": "控制主要處理步驟分塊計算時的記憶體預算；不是整台電腦的硬性使用上限。",
+      "group": "compute",
+      "group_label": "運算資源",
+      "input_type": "number",
+      "allowed": "正實數，GB",
+      "allow_auto": true,
+      "help": "控制主要處理步驟分塊計算時的記憶體預算；不是整台電腦的硬性使用上限。",
+      "tradeoff": "較大額度可減少分塊，但增加記憶體壓力；這不是全程序的硬性記憶體上限。",
+      "choices": [],
+      "default": "4",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintMemory",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.compute.cluster",
+      "label": "平行運算方式",
+      "purpose": "選擇本機或排程叢集，或關閉平行；主要用於網路反演及 DEM 誤差估計。",
+      "group": "compute",
+      "group_label": "運算資源",
+      "input_type": "enum",
+      "allowed": "none, local, slurm, pbs, lsf",
+      "allow_auto": true,
+      "help": "選擇本機或排程叢集，或關閉平行；主要用於網路反演及 DEM 誤差估計。",
+      "tradeoff": "local 可平行部分步驟；遠端類型須有對應排程服務。none 較容易部署。",
+      "choices": [
+        "none",
+        "local",
+        "slurm",
+        "pbs",
+        "lsf"
+      ],
+      "default": "none",
+      "baseline": "no",
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "平行執行器與資源排程尚未接入工作台；目前使用單一受控分析程序。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.compute.numWorker",
+      "label": "工作程序數",
+      "purpose": "控制平行工作程序數；增加程序也會增加總記憶體需求。",
+      "group": "compute",
+      "group_label": "運算資源",
+      "input_type": "structured",
+      "allowed": "正整數、all 或百分比；all 與百分比僅供本機使用",
+      "allow_auto": true,
+      "help": "控制平行工作程序數；增加程序也會增加總記憶體需求。",
+      "tradeoff": "增加工作數可能加速，也增加記憶體與 I/O 競爭；應依核心、RAM 和資料量測試。",
+      "choices": [],
+      "default": "4",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "平行執行器與資源排程尚未接入工作台；目前使用單一受控分析程序。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 本機預設 4；非本機叢集通常解析為 40。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.compute.config",
+      "label": "叢集設定名稱",
+      "purpose": "指定非本機排程叢集使用的設定檔名稱。",
+      "group": "compute",
+      "group_label": "運算資源",
+      "input_type": "structured",
+      "allowed": "叢集設定名稱或 none",
+      "allow_auto": true,
+      "help": "指定非本機排程叢集使用的設定檔名稱。",
+      "tradeoff": "選擇叢集配置名稱，沒有科學上的優劣；必須與部署環境一致。",
+      "choices": [],
+      "default": "none",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "平行執行器與資源排程尚未接入工作台；目前使用單一受控分析程序。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.load.processor",
+      "label": "上游處理器",
+      "purpose": "決定輸入檔案格式與中繼資料的讀取方式；需與實際產物一致。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "enum",
+      "allowed": "isce, aria, hyp3, gmtsar, snap, gamma, roipac, nisar",
+      "allow_auto": true,
+      "help": "決定輸入檔案格式與中繼資料的讀取方式；需與實際產物一致。",
+      "tradeoff": "依輸入成果的生產工具選擇，並非選擇不同反演演算法。列出名稱不代表工作台已支援該輸入。",
+      "choices": [
+        "isce",
+        "aria",
+        "hyp3",
+        "gmtsar",
+        "snap",
+        "gamma",
+        "roipac",
+        "nisar"
+      ],
+      "default": "isce",
+      "baseline": "isce",
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.load.autoPath",
+      "label": "自動尋找輸入路徑",
+      "purpose": "使用 MintPy 預先定義的處理器路徑規則。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "使用 MintPy 預先定義的處理器路徑規則。",
+      "tradeoff": "自動尋路省設定，但要求資料目錄符合規則；明確指定路徑較可追溯。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": "no",
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.updateMode",
+      "label": "沿用完整載入結果",
+      "purpose": "已有完整 HDF5 載入結果時可略過重新載入；修改輸入後仍需檢查一致性。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "已有完整 HDF5 載入結果時可略過重新載入；修改輸入後仍需檢查一致性。",
+      "tradeoff": "可省去完整資料的重載；需另驗證來源與設定是否改變，不能只因已有 HDF5 就視為可重用。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.compression",
+      "label": "HDF5 壓縮",
+      "purpose": "權衡儲存空間與讀寫速度。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "enum",
+      "allowed": "default, none, lzf, gzip",
+      "allow_auto": true,
+      "help": "權衡儲存空間與讀寫速度。",
+      "tradeoff": "壓縮節省空間但增加 CPU/I/O 成本；gzip 與 lzf 的效果取決於資料，不保證固定壓縮率。",
+      "choices": [
+        "default",
+        "none",
+        "lzf",
+        "gzip"
+      ],
+      "default": "default",
+      "baseline": "lzf",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 default 對干涉／電離層／偏移堆疊採不壓縮（none），對幾何資料採 lzf；不是所有 HDF5 都使用相同壓縮（load_data.py:858–859、889）。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.load.frequency",
+      "label": "NISAR 頻段群組",
+      "purpose": "指定 NISAR 的 A 或 B 資料群組；其他處理器通常不適用。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "enum",
+      "allowed": "A, B",
+      "allow_auto": true,
+      "help": "指定 NISAR 的 A 或 B 資料群組；其他處理器通常不適用。",
+      "tradeoff": "僅 NISAR 使用，須與實際頻率資料一致；對目前 ALOS-2 專案不適用。",
+      "choices": [
+        "A",
+        "B"
+      ],
+      "default": "A",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.load.metaFile",
+      "label": "共同中繼資料",
+      "purpose": "ISCE 輸入使用的共同影像或軌道中繼資料路徑。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "ISCE 輸入使用的共同影像或軌道中繼資料路徑。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.baselineDir",
+      "label": "基線資料夾",
+      "purpose": "提供各日期的垂直基線資訊。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供各日期的垂直基線資訊。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.unwFile",
+      "label": "解纏干涉圖",
+      "purpose": "指定解纏相位檔案路徑或萬用字元模式。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定解纏相位檔案路徑或萬用字元模式。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.corFile",
+      "label": "空間相干性",
+      "purpose": "指定與干涉配對對應的空間相干性檔案。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定與干涉配對對應的空間相干性檔案。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.connCompFile",
+      "label": "解纏連通區",
+      "purpose": "指定解纏可靠區域標籤；部分解纏錯誤校正需要此資料。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定解纏可靠區域標籤；部分解纏錯誤校正需要此資料。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.intFile",
+      "label": "纏繞干涉圖",
+      "purpose": "可選的原始纏繞相位檔案。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "可選的原始纏繞相位檔案。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.magFile",
+      "label": "干涉振幅",
+      "purpose": "可選的干涉圖振幅檔案。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "可選的干涉圖振幅檔案。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.ionUnwFile",
+      "label": "電離層解纏估計",
+      "purpose": "提供分頻法產生的電離層相位估計；不是一般已校正的解纏圖。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供分頻法產生的電離層相位估計；不是一般已校正的解纏圖。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.ionCorFile",
+      "label": "電離層估計相干性",
+      "purpose": "提供電離層干涉堆疊的相干性資料。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供電離層干涉堆疊的相干性資料。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.ionConnCompFile",
+      "label": "電離層估計連通區",
+      "purpose": "提供電離層解纏堆疊的有效連通區。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供電離層解纏堆疊的有效連通區。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.azOffFile",
+      "label": "方位向偏移",
+      "purpose": "提供偏移追蹤的方位向位移資料。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供偏移追蹤的方位向位移資料。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.rgOffFile",
+      "label": "距離向偏移",
+      "purpose": "提供偏移追蹤的距離向位移資料。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供偏移追蹤的距離向位移資料。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.azOffStdFile",
+      "label": "方位向偏移誤差",
+      "purpose": "提供方位向偏移的不確定度資料；單位與格式須符合上游處理器。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供方位向偏移的不確定度資料；單位與格式須符合上游處理器。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.rgOffStdFile",
+      "label": "距離向偏移誤差",
+      "purpose": "提供距離向偏移的不確定度資料；單位與格式須符合上游處理器。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供距離向偏移的不確定度資料；單位與格式須符合上游處理器。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.offSnrFile",
+      "label": "偏移訊噪比",
+      "purpose": "可選的偏移追蹤訊噪比資料。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "可選的偏移追蹤訊噪比資料。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.demFile",
+      "label": "DEM 高程",
+      "purpose": "提供分析網格上的高程資料。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供分析網格上的高程資料。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.lookupYFile",
+      "label": "緯度或 Y 對照",
+      "purpose": "提供雷達座標與地理座標的 Y 或緯度對照。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供雷達座標與地理座標的 Y 或緯度對照。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.lookupXFile",
+      "label": "經度或 X 對照",
+      "purpose": "提供雷達座標與地理座標的 X 或經度對照。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供雷達座標與地理座標的 X 或經度對照。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.incAngleFile",
+      "label": "入射角",
+      "purpose": "提供逐像素入射角等幾何資訊。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供逐像素入射角等幾何資訊。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.azAngleFile",
+      "label": "方位角",
+      "purpose": "提供 LOS 方向相關的方位角資訊。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供 LOS 方向相關的方位角資訊。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.shadowMaskFile",
+      "label": "雷達陰影遮罩",
+      "purpose": "提供雷達陰影區域遮罩。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供雷達陰影區域遮罩。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.waterMaskFile",
+      "label": "水域遮罩",
+      "purpose": "提供水域與陸地有效範圍。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供水域與陸地有效範圍。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.load.bperpFile",
+      "label": "逐像素垂直基線",
+      "purpose": "可選的二維垂直基線資料。",
+      "group": "load",
+      "group_label": "資料載入",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "可選的二維垂直基線資料。",
+      "tradeoff": "資料來源欄位，無獨立演算法優劣；需符合處理器規格，並核對日期、網格、單位及有效值。選用資料缺失時不可默默替代。",
+      "choices": [],
+      "default": "auto",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "由 alosStack 載入介面建立來源路徑與處理器設定，避免混入不同格網、日期或處理器。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.subset.yx",
+      "label": "雷達像素裁切",
+      "purpose": "在載入時依 y／影像行（row）與 x／影像列（column）範圍裁切，減少後續運算規模。",
+      "group": "subset",
+      "group_label": "分析範圍",
+      "input_type": "structured",
+      "allowed": "y0:y1,x0:x1；y 為影像行（row），x 為影像列（column）；或 no",
+      "allow_auto": true,
+      "help": "在載入時依 y／影像行（row）與 x／影像列（column）範圍裁切，減少後續運算規模。",
+      "tradeoff": "小範圍降低運算量；裁切不可排除必要參考區，且需預覽真正的雷達／地理邊界。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintY0",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.subset.lalo",
+      "label": "經緯度裁切",
+      "purpose": "在載入時指定南北緯度及東西經度範圍；需要可用的座標對照。",
+      "group": "subset",
+      "group_label": "分析範圍",
+      "input_type": "structured",
+      "allowed": "S:N,W:E 或 no",
+      "allow_auto": true,
+      "help": "在載入時指定南北緯度及東西經度範圍；需要可用的座標對照。",
+      "tradeoff": "小範圍降低運算量；裁切不可排除必要參考區，且需預覽真正的雷達／地理邊界。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "regionSouth",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.multilook.method",
+      "label": "載入時降採樣方法",
+      "purpose": "選擇抽樣、平均或中位數；平均與中位數可能破壞解纏錯誤的整數週期關係。",
+      "group": "multilook",
+      "group_label": "載入降採樣",
+      "input_type": "enum",
+      "allowed": "nearest, mean, median",
+      "allow_auto": true,
+      "help": "選擇抽樣、平均或中位數；平均與中位數可能破壞解纏錯誤的整數週期關係。",
+      "tradeoff": "nearest 取樣不平滑；mean／median 可抑制部分噪聲，但可能混合連通區／整周解纏錯誤。",
+      "choices": [
+        "nearest",
+        "mean",
+        "median"
+      ],
+      "default": "nearest",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "目前成果地圖與取點使用原載入格網；載入時降採樣尚未完成整合驗證。",
+      "sources": [
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.multilook.ystep",
+      "label": "y／影像行（row）降採樣倍率",
+      "purpose": "降低 y／影像行（row）方向解析度與資料量；1 保留原有解析度。",
+      "group": "multilook",
+      "group_label": "載入降採樣",
+      "input_type": "number",
+      "allowed": "整數 ≥ 1",
+      "allow_auto": true,
+      "help": "降低 y／影像行（row）方向解析度與資料量；1 保留原有解析度。",
+      "tradeoff": "較大的 y／影像行（row）方向步長減少資料量與空間細節；需要保留小尺度變形時不宜任意加大。",
+      "choices": [],
+      "default": "1",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "目前成果地圖與取點使用原載入格網；載入時降採樣尚未完成整合驗證。",
+      "sources": [
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.multilook.xstep",
+      "label": "x／影像列（column）降採樣倍率",
+      "purpose": "降低 x／影像列（column）方向解析度與資料量；1 保留原有解析度。",
+      "group": "multilook",
+      "group_label": "載入降採樣",
+      "input_type": "number",
+      "allowed": "整數 ≥ 1",
+      "allow_auto": true,
+      "help": "降低 x／影像列（column）方向解析度與資料量；1 保留原有解析度。",
+      "tradeoff": "較大的 x／影像列（column）方向步長減少資料量與空間細節；需同時考慮兩方向原始像素間距。",
+      "choices": [],
+      "default": "1",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "目前成果地圖與取點使用原載入格網；載入時降採樣尚未完成整合驗證。",
+      "sources": [
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.tempBaseMax",
+      "label": "最大時間基線",
+      "purpose": "排除日期間隔超過門檻的干涉配對，單位為天。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "number",
+      "allowed": "正數，天，或 no",
+      "allow_auto": true,
+      "help": "排除日期間隔超過門檻的干涉配對，單位為天。 這是載入後實際執行的 MintPy 原生篩選；與配對清單的篩選建議按鈕分開。",
+      "tradeoff": "較短時間基線可能較相干，但減少跨長時間的連結；應同時看連通及冗餘。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "可用 no 關閉或正數設定上限；篩選後重新檢查保留日期與網路連通性。",
+      "min": 0,
+      "exclusive_min": true,
+      "step": "any",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.perpBaseMax",
+      "label": "最大垂直基線",
+      "purpose": "排除垂直基線超過門檻的配對，單位為公尺。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "number",
+      "allowed": "正數，公尺，或 no",
+      "allow_auto": true,
+      "help": "排除垂直基線超過門檻的配對，單位為公尺。 這是載入後實際執行的 MintPy 原生篩選；與配對清單的篩選建議按鈕分開。",
+      "tradeoff": "較短垂直基線可能減少幾何去相關；过嚴會減少觀測，亦改變地形誤差估計的基線分布。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "可用 no 關閉或正數設定上限；篩選後重新檢查保留日期與網路連通性。",
+      "min": 0,
+      "exclusive_min": true,
+      "step": "any",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.connNumMax",
+      "label": "每日期鄰近連接數",
+      "purpose": "限制日期網路的鄰近配對數；可能減少冗餘及連通性。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "number",
+      "allowed": "正整數或 no",
+      "allow_auto": true,
+      "help": "限制日期網路的鄰近配對數；可能減少冗餘及連通性。",
+      "tradeoff": "限制鄰接日期數減少配對與運算量；可能犧牲冗餘，並非越多或越少一定越好。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 1,
+      "max": null,
+      "step": 1,
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.startDate",
+      "label": "網路開始日期",
+      "purpose": "只保留指定日期之後的觀測日期。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD 或 no",
+      "allow_auto": true,
+      "help": "只保留指定日期之後的觀測日期。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintStartDate",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.endDate",
+      "label": "網路結束日期",
+      "purpose": "只保留指定日期之前的觀測日期。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD 或 no",
+      "allow_auto": true,
+      "help": "只保留指定日期之前的觀測日期。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintEndDate",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.excludeDate",
+      "label": "排除整個日期",
+      "purpose": "從干涉網路排除指定日期及相關配對。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "structured",
+      "allowed": "日期清單或 no",
+      "allow_auto": true,
+      "help": "從干涉網路排除指定日期及相關配對。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintDates",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.excludeDate12",
+      "label": "排除個別配對",
+      "purpose": "保留日期，但排除指定干涉配對。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD_YYYYMMDD 配對清單或 no",
+      "allow_auto": true,
+      "help": "保留日期，但排除指定干涉配對。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintPairs",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.excludeIfgIndex",
+      "label": "依索引排除配對",
+      "purpose": "依從 0 開始的干涉圖索引排除；索引需對應目前堆疊。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "structured",
+      "allowed": "從 0 起的索引清單／範圍或 no",
+      "allow_auto": true,
+      "help": "依從 0 開始的干涉圖索引排除；索引需對應目前堆疊。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "使用配對清單按日期排除較容易追溯；工作台不提供可能隨排序改變的索引排除。",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.referenceFile",
+      "label": "採用既有配對清單",
+      "purpose": "依配對清單或另一個干涉堆疊決定保留網路。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "path",
+      "allowed": "日期配對清單文字檔、ifgramStack.h5 路徑或 no",
+      "allow_auto": true,
+      "help": "依配對清單或另一個干涉堆疊決定保留網路。",
+      "tradeoff": "重現既定配對網路方便比較；須確認日期與本次資料相符。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "/path/to/pairs.txt",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.coherenceBased",
+      "label": "以平均相干性篩選",
+      "purpose": "依指定範圍及遮罩的平均空間相干性挑選配對。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "依指定範圍及遮罩的平均空間相干性挑選配對。",
+      "tradeoff": "按平均相干性篩選可排除品質差配對；平均值受 mask/AOI 影響，也可能掩蓋局部差異。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": "no",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.minCoherence",
+      "label": "配對平均相干性門檻",
+      "purpose": "控制相干性篩選強度；提高門檻可能減少網路冗餘。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "number",
+      "allowed": "0 到 1",
+      "allow_auto": true,
+      "help": "控制相干性篩選強度；提高門檻可能減少網路冗餘。",
+      "tradeoff": "提高門檻更嚴格，但可能丟掉重要連接；不能與時間相干性門檻混用。",
+      "choices": [],
+      "default": "0.7",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 0,
+      "max": 1,
+      "step": "any",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.areaRatioBased",
+      "label": "以有效相干面積篩選",
+      "purpose": "以有效相干區域所占比例挑選配對。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "以有效相干區域所占比例挑選配對。",
+      "tradeoff": "依有效相干區比例評估配對；比單一平均值提供另一種面積觀點，但取決於相干判定與 AOI。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": "no",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.minAreaRatio",
+      "label": "有效相干面積比例門檻",
+      "purpose": "控制有效相干面積篩選強度。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "number",
+      "allowed": "0 到 1",
+      "allow_auto": true,
+      "help": "控制有效相干面積篩選強度。",
+      "tradeoff": "提高比例要求可排除覆蓋不足配對，也可能使稀疏網路斷聯。",
+      "choices": [],
+      "default": "0.75",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 0,
+      "max": 1,
+      "step": "any",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.keepMinSpanTree",
+      "label": "保留最小生成樹",
+      "purpose": "在相干性或面積篩選時保留維持網路連接的核心配對；不代表這些配對品質一定良好。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "在相干性或面積篩選時保留維持網路連接的核心配對；不代表這些配對品質一定良好。",
+      "tradeoff": "保留連通骨架，可能因此保留低於品質門檻的配對；連通不等於有足夠冗餘。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.maskFile",
+      "label": "網路品質統計遮罩",
+      "purpose": "指定哪些像素納入配對品質統計。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定哪些像素納入配對品質統計。",
+      "tradeoff": "限定此步驟使用的像素或品質資訊；可靠遮罩可減少污染，過嚴或不相符遮罩會減少覆蓋或扭曲估計。須與本次格網一致。",
+      "choices": [],
+      "default": "waterMask.h5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "此 MintPy 版本的 no 不會可靠清除 CLI 預設檔案；工作台僅提供 auto 或明確檔案，避免顯示關閉卻仍使用預設資料。",
+      "path_kind": "file",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.network.aoiYX",
+      "label": "網路品質像素範圍",
+      "purpose": "僅在指定雷達像素範圍計算配對品質，不等同載入裁切。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "structured",
+      "allowed": "y0:y1,x0:x1；y 為影像行（row），x 為影像列（column）；或 no",
+      "allow_auto": true,
+      "help": "僅在指定雷達像素範圍計算配對品質，不等同載入裁切。",
+      "tradeoff": "以雷達像素指定品質統計區；應代表研究目標，不要只選最亮的少數像素。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "0:500,0:500",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.network.aoiLALO",
+      "label": "網路品質經緯度範圍",
+      "purpose": "僅在指定地理範圍計算配對品質，不等同載入裁切。",
+      "group": "network",
+      "group_label": "干涉網路篩選",
+      "input_type": "structured",
+      "allowed": "S:N,W:E 或 no",
+      "allow_auto": true,
+      "help": "僅在指定地理範圍計算配對品質，不等同載入裁切。",
+      "tradeoff": "以經緯度指定品質統計區；不是用來裁切研究成果，兩者用途不同。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Berardino et al. (2002)：小基線時序方法",
+          "url": "https://doi.org/10.1109/TGRS.2002.803792"
+        },
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "24.8:25.2,121.3:121.8",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.reference.yx",
+      "label": "空間參考點像素",
+      "purpose": "指定共同空間參考點的 y／影像行（row）與 x／影像列（column）；需確認地物穩定性與資料品質。",
+      "group": "reference",
+      "group_label": "空間與時間參考",
+      "input_type": "structured",
+      "allowed": "y（影像行／row）,x（影像列／column）或 auto",
+      "allow_auto": true,
+      "help": "指定共同空間參考點的 y／影像行（row）與 x／影像列（column）；需確認地物穩定性與資料品質。",
+      "tradeoff": "明確指定共同穩定像素可重現；行列必須相對於本次載入格網。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintLoad",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.reference.lalo",
+      "label": "空間參考點經緯度",
+      "purpose": "以經緯度指定共同空間參考點。",
+      "group": "reference",
+      "group_label": "空間與時間參考",
+      "input_type": "structured",
+      "allowed": "緯度,經度 或 auto",
+      "allow_auto": true,
+      "help": "以經緯度指定共同空間參考點。",
+      "tradeoff": "地理位置較易理解；須核對查找表與最後取到的雷達像素。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintLoad",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.reference.maskFile",
+      "label": "參考點候選遮罩",
+      "purpose": "限制自動選點時可用的像素。",
+      "group": "reference",
+      "group_label": "空間與時間參考",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "限制自動選點時可用的像素。",
+      "tradeoff": "限定此步驟使用的像素或品質資訊；可靠遮罩可減少污染，過嚴或不相符遮罩會減少覆蓋或扭曲估計。須與本次格網一致。",
+      "choices": [],
+      "default": "maskConnComp.h5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 自動值為 maskConnComp.h5；參考點驗證只有在遮罩檔存在時才讀取並檢查遮罩，缺檔不等於已確認共同有效區（reference_point.py:351–358）。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.reference.coherenceFile",
+      "label": "參考點相干性來源",
+      "purpose": "指定自動選點所使用的相干性影像。",
+      "group": "reference",
+      "group_label": "空間與時間參考",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定自動選點所使用的相干性影像。",
+      "tradeoff": "限定此步驟使用的像素或品質資訊；可靠遮罩可減少污染，過嚴或不相符遮罩會減少覆蓋或扭曲估計。須與本次格網一致。",
+      "choices": [],
+      "default": "avgSpatialCoh.h5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "此 MintPy 版本的 no 不會可靠清除 CLI 預設檔案；工作台僅提供 auto 或明確檔案，避免顯示關閉卻仍使用預設資料。",
+      "path_kind": "file",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.reference.minCoherence",
+      "label": "參考點最低相干性",
+      "purpose": "限制自動參考點的相干性；高相干不代表零變形。",
+      "group": "reference",
+      "group_label": "空間與時間參考",
+      "input_type": "number",
+      "allowed": "0 到 1",
+      "allow_auto": true,
+      "help": "限制自動參考點的相干性；高相干不代表零變形。",
+      "tradeoff": "提高可縮小候選範圍，但高相干像素仍可能變形；門檻過高可能沒有候選點。",
+      "choices": [],
+      "default": "0.85",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintRefCoh",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.unwrapError.method",
+      "label": "解纏錯誤校正方法",
+      "purpose": "選擇跨連通區橋接、相位閉合或組合方法；需要對應資料與可辨識條件。",
+      "group": "unwrapError",
+      "group_label": "解纏錯誤校正",
+      "input_type": "enum",
+      "allowed": "no, bridging, phase_closure, bridging+phase_closure",
+      "allow_auto": true,
+      "help": "選擇跨連通區橋接、相位閉合或組合方法；需要對應資料與可辨識條件。",
+      "tradeoff": "bridging 假設橋接兩端可比較；phase_closure 依賴冗餘與稀疏錯誤。合併方法更複雜，仍需檢查。",
+      "choices": [
+        "no",
+        "bridging",
+        "phase_closure",
+        "bridging+phase_closure"
+      ],
+      "default": "no",
+      "baseline": "no",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.unwrapError.waterMaskFile",
+      "label": "解纏校正水域遮罩",
+      "purpose": "防止水域影響可靠區域與校正估計。",
+      "group": "unwrapError",
+      "group_label": "解纏錯誤校正",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "防止水域影響可靠區域與校正估計。",
+      "tradeoff": "限定此步驟使用的像素或品質資訊；可靠遮罩可減少污染，過嚴或不相符遮罩會減少覆蓋或扭曲估計。須與本次格網一致。",
+      "choices": [],
+      "default": "waterMask.h5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 預設 waterMask.h5 只有在檔案存在時才使用；橋接及相位閉合校正均在檔案缺失時改為不套用水域遮罩（cli/unwrap_error_bridging.py:83–84；cli/unwrap_error_phase_closure.py:113–114）。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.unwrapError.connCompMinArea",
+      "label": "最小解纏連通區面積",
+      "purpose": "排除過小區域，單位為像素。",
+      "group": "unwrapError",
+      "group_label": "解纏錯誤校正",
+      "input_type": "number",
+      "allowed": "正數，像素面積",
+      "allow_auto": true,
+      "help": "排除過小區域，單位為像素。",
+      "tradeoff": "提高面積門檻可剔除小碎片，也可能丟掉真實小區域。",
+      "choices": [],
+      "default": "2.5e3",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 0,
+      "max": null,
+      "step": "any",
+      "exclusive_min": true,
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.unwrapError.numSample",
+      "label": "閉合校正抽樣數",
+      "purpose": "控制共同連通區內用於整數模糊度估計的抽樣數。",
+      "group": "unwrapError",
+      "group_label": "解纏錯誤校正",
+      "input_type": "number",
+      "allowed": "整數 ≥ 1",
+      "allow_auto": true,
+      "help": "控制共同連通區內用於整數模糊度估計的抽樣數。",
+      "tradeoff": "增加取樣較耗時，能更充分描述區內差異，但不會修正錯誤的方法假設。",
+      "choices": [],
+      "default": "100",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 1,
+      "max": null,
+      "step": 1,
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.unwrapError.ramp",
+      "label": "橋接前暫時移除坡度",
+      "purpose": "估計區域間偏差前暫時去除平面或曲面，校正後再加回。",
+      "group": "unwrapError",
+      "group_label": "解纏錯誤校正",
+      "input_type": "enum",
+      "allowed": "no, linear, quadratic",
+      "allow_auto": true,
+      "help": "估計區域間偏差前暫時去除平面或曲面，校正後再加回。",
+      "tradeoff": "橋接前暫去背景斜坡可改善相鄰區比較；過度模型化可能誤估橋接差值，與最終 deramp 不同。",
+      "choices": [
+        "no",
+        "linear",
+        "quadratic"
+      ],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.unwrapError.bridgePtsRadius",
+      "label": "橋接端點取樣半徑",
+      "purpose": "以端點附近視窗的相位統計量估計跨區偏差。",
+      "group": "unwrapError",
+      "group_label": "解纏錯誤校正",
+      "input_type": "number",
+      "allowed": "正整數，像素",
+      "allow_auto": true,
+      "help": "以端點附近視窗的相位統計量估計跨區偏差。",
+      "tradeoff": "較大窗口可減少隨機噪聲，也可能混入空間變化；狹窄或強梯度區域需特別檢查。",
+      "choices": [],
+      "default": "50",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 1,
+      "max": null,
+      "step": 1,
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.networkInversion.weightFunc",
+      "label": "網路反演權重",
+      "purpose": "決定各干涉觀測在最小平方法中的相對權重。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "enum",
+      "allowed": "var, fim, coh, no",
+      "allow_auto": true,
+      "help": "決定各干涉觀測在最小平方法中的相對權重。",
+      "tradeoff": "var 依相位變異數、fim 依 Fisher 資訊、coh 依相干性、不加權等權；品質模型與速度間有取捨。",
+      "choices": [
+        "var",
+        "fim",
+        "coh",
+        "no"
+      ],
+      "default": "var",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintWeight",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.networkInversion.waterMaskFile",
+      "label": "反演水域遮罩",
+      "purpose": "排除不適合進行位移反演的水域。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "排除不適合進行位移反演的水域。",
+      "tradeoff": "限定此步驟使用的像素或品質資訊；可靠遮罩可減少污染，過嚴或不相符遮罩會減少覆蓋或扭曲估計。須與本次格網一致。",
+      "choices": [],
+      "default": "waterMask.h5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 預設 waterMask.h5 只有在檔案存在時才使用；不存在時改為不套用此遮罩（cli/ifgram_inversion.py:207–208）。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.networkInversion.minNormVelocity",
+      "label": "最小範數速度約束",
+      "purpose": "選擇對速度或相位施加最小範數條件；尤其影響欠定網路。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "選擇對速度或相位施加最小範數條件；尤其影響欠定網路。",
+      "tradeoff": "選擇最小範數速度或相位的解法假設；在欠定問題中尤其重要，不能替代網路品質檢查。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.networkInversion.maskDataset",
+      "label": "逐配對像素遮罩依據",
+      "purpose": "依相干性、連通區或偏移誤差遮罩觀測；可能造成逐像素網路缺口。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "enum",
+      "allowed": "no, coherence, connectComponent；本介面處理干涉相位，未接入 offset 反演。",
+      "allow_auto": true,
+      "help": "依相干性、連通區或偏移誤差遮罩觀測；可能造成逐像素網路缺口。",
+      "tradeoff": "選不同遮罩會改變每個像素可用的配對；可能抑制壞值，也可能使局部時間網路斷聯。",
+      "choices": [
+        "no",
+        "coherence",
+        "connectComponent"
+      ],
+      "default": "no",
+      "baseline": "connectComponent",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.networkInversion.maskThreshold",
+      "label": "逐配對像素遮罩門檻",
+      "purpose": "門檻單位與方向取決於所選遮罩資料。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "number",
+      "allowed": "非負實數，單位依遮罩類型",
+      "allow_auto": true,
+      "help": "門檻單位與方向取決於所選遮罩資料。",
+      "tradeoff": "門檻意義依遮罩種類不同：相干性通常剔除低值，offset 標準差則剔除高值。",
+      "choices": [],
+      "default": "0.4",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 0,
+      "max": null,
+      "step": "any",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.networkInversion.minRedundancy",
+      "label": "最低日期配對冗餘",
+      "purpose": "要求像素的各日期有足夠干涉觀測支持。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "number",
+      "allowed": "實數 ≥ 1",
+      "allow_auto": true,
+      "help": "要求像素的各日期有足夠干涉觀測支持。",
+      "tradeoff": "提高要求可排除支撐不足的像素，代價是空間覆蓋減少；仍需檢查局部網路。",
+      "choices": [],
+      "default": "1.0",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintRedundancy",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.networkInversion.minTempCoh",
+      "label": "最低時間相干性",
+      "purpose": "控制最終可靠像素遮罩，不能單獨保證位移正確。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "number",
+      "allowed": "0 到 1",
+      "allow_auto": true,
+      "help": "控制最終可靠像素遮罩，不能單獨保證位移正確。",
+      "tradeoff": "提高門檻通常減少保留像素；高值不證明沒有大氣、軌道或系統誤差。",
+      "choices": [],
+      "default": "0.7",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintTemporal",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.networkInversion.minNumPixel",
+      "label": "最少可靠像素數",
+      "purpose": "可靠遮罩剩餘像素太少時停止，避免產生幾乎沒有支撐的成果。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "number",
+      "allowed": "整數 > 1",
+      "allow_auto": true,
+      "help": "可靠遮罩剩餘像素太少時停止，避免產生幾乎沒有支撐的成果。",
+      "tradeoff": "這是有效遮罩像素數的停止檢查；小 ROI 可能需調整，降低門檻不會提升品質。",
+      "choices": [],
+      "default": "100",
+      "baseline": "100",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 2,
+      "max": null,
+      "step": 1,
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.networkInversion.shadowMask",
+      "label": "使用雷達陰影遮罩",
+      "purpose": "有陰影資料時排除受陰影影響的像素。",
+      "group": "networkInversion",
+      "group_label": "網路反演與品質遮罩",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "有陰影資料時排除受陰影影響的像素。",
+      "tradeoff": "剔除陰影區可減少不可靠成果，需有相符幾何遮罩；可能減少可用面積。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 即使設定為 yes，也只有幾何檔含 shadowMask 資料集時才會排除陰影；缺少資料時不套用，不能將開關視為已完成陰影校正（smallbaselineApp.py:399–402）。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.solidEarthTides",
+      "label": "固體地球潮校正",
+      "purpose": "利用潮汐模型校正地表週期性彈性位移，需額外模型套件。",
+      "group": "solidEarthTides",
+      "group_label": "固體地球潮",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "利用潮汐模型校正地表週期性彈性位移，需額外模型套件。",
+      "tradeoff": "可移除可預測的固體潮 LOS 分量；須先核對時間、幾何、依賴套件與上游改正沿革。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": "no",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.ionosphericDelay.method",
+      "label": "電離層延遲校正",
+      "purpose": "使用上游分頻法估計校正電離層延遲；必須避免重複校正。",
+      "group": "ionosphericDelay",
+      "group_label": "電離層校正",
+      "input_type": "enum",
+      "allowed": "no, split_spectrum",
+      "allow_auto": true,
+      "help": "使用上游分頻法估計校正電離層延遲；必須避免重複校正。",
+      "tradeoff": "split_spectrum 需對應電離層產物；已由上游扣除同一電離層時不能再次套用。",
+      "choices": [
+        "no",
+        "split_spectrum"
+      ],
+      "default": "no",
+      "baseline": "no",
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "目前沒有獨立電離層輸入介面；上游可能已套用校正，需避免重複扣除。",
+      "sources": [
+        {
+          "title": "Liang et al. (2018)：ALOS-2 L 波段時序",
+          "url": "https://doi.org/10.1109/TGRS.2018.2821150"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.ionosphericDelay.excludeDate",
+      "label": "電離層反演排除日期",
+      "purpose": "排除電離層估計品質不佳的日期，與一般干涉網路排除分開。",
+      "group": "ionosphericDelay",
+      "group_label": "電離層校正",
+      "input_type": "structured",
+      "allowed": "日期清單或 no",
+      "allow_auto": true,
+      "help": "排除電離層估計品質不佳的日期，與一般干涉網路排除分開。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "目前沒有獨立電離層輸入介面；上游可能已套用校正，需避免重複扣除。",
+      "sources": [
+        {
+          "title": "Liang et al. (2018)：ALOS-2 L 波段時序",
+          "url": "https://doi.org/10.1109/TGRS.2018.2821150"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.ionosphericDelay.excludeDate12",
+      "label": "電離層反演排除配對",
+      "purpose": "排除電離層估計品質不佳的個別配對。",
+      "group": "ionosphericDelay",
+      "group_label": "電離層校正",
+      "input_type": "structured",
+      "allowed": "日期配對清單或 no",
+      "allow_auto": true,
+      "help": "排除電離層估計品質不佳的個別配對。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "目前沒有獨立電離層輸入介面；上游可能已套用校正，需避免重複扣除。",
+      "sources": [
+        {
+          "title": "Liang et al. (2018)：ALOS-2 L 波段時序",
+          "url": "https://doi.org/10.1109/TGRS.2018.2821150"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.troposphericDelay.method",
+      "label": "對流層延遲方法",
+      "purpose": "選擇天氣模型、高程相關法、GACOS 或 OPERA 等來源；不能保證每次校正皆改善。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "enum",
+      "allowed": "no, height_correlation, pyaps（完整 ERA5 快取）, gacos",
+      "allow_auto": true,
+      "help": "選擇天氣模型、高程相關法、GACOS 或 OPERA 等來源；不能保證每次校正皆改善。",
+      "tradeoff": "height_correlation 不需外部氣象但可能混入地形相關變形；PyAPS/GACOS/OPERA 需外部資料與校正品質檢查。",
+      "choices": [
+        "no",
+        "height_correlation",
+        "pyaps",
+        "gacos"
+      ],
+      "default": "pyaps",
+      "baseline": "no",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 列出的選項不保證所選環境已具備相依套件、帳號與外部資料。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.troposphericDelay.weatherModel",
+      "label": "天氣模型",
+      "purpose": "選擇 PyAPS 所使用的氣象資料；可用性取決於所裝 PyAPS 版本與資料服務。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "enum",
+      "allowed": "ERA5；其他氣象模型尚未驗證。",
+      "allow_auto": true,
+      "help": "選擇 PyAPS 所使用的氣象資料；可用性取決於所裝 PyAPS 版本與資料服務。",
+      "tradeoff": "ERA5／MERRA／NARR 的覆蓋與套件支援不同；在選用前核對相應 PyAPS 安裝，不能把枚舉當成已可執行。",
+      "choices": [
+        "ERA5"
+      ],
+      "default": "ERA5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 列出的選項不保證所選環境已具備相依套件、帳號與外部資料。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.troposphericDelay.weatherDir",
+      "label": "已下載的 ERA5 資料資料夾",
+      "purpose": "保存並重用氣象模式檔案。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "選擇涵蓋所有保留日期與觀測時間的 ERA5 快取。工作台只讀取並複製到分析專用資料夾，不會下載或處理帳號憑證。",
+      "tradeoff": "共用氣象快取可節省下載；需有儲存空間、完整日期及適當權限。",
+      "choices": [],
+      "default": "${WEATHER_DIR}",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "只支援已有完整資料的 ERA5；執行前逐日期檢查。",
+      "path_kind": "directory",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.troposphericDelay.polyOrder",
+      "label": "高程相關多項式階數",
+      "purpose": "控制相位與高程關係的複雜度；高階可能吸收真實變形。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "enum",
+      "allowed": "1, 2, 3",
+      "allow_auto": true,
+      "help": "控制相位與高程關係的複雜度；高階可能吸收真實變形。",
+      "tradeoff": "較高階高程擬合更靈活，也更易把地形相關真實變形擬合掉。",
+      "choices": [
+        "1",
+        "2",
+        "3"
+      ],
+      "default": "1",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.troposphericDelay.looks",
+      "label": "高程相關估計降採樣",
+      "purpose": "只對參數估計額外降採樣，不等同改變最後輸出網格。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "number",
+      "allowed": "正整數",
+      "allow_auto": true,
+      "help": "只對參數估計額外降採樣，不等同改變最後輸出網格。",
+      "tradeoff": "只在估計高程關係時加強平均；可降噪，但減少用於擬合的細節。",
+      "choices": [],
+      "default": "8",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 1,
+      "max": null,
+      "step": 1,
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.troposphericDelay.minCorrelation",
+      "label": "最低相位高程相關",
+      "purpose": "高程相關法僅在相關性達門檻時套用。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "number",
+      "allowed": "0 到 1",
+      "allow_auto": true,
+      "help": "高程相關法僅在相關性達門檻時套用。",
+      "tradeoff": "提高可避免套用弱關係校正，但可能略過真實分層延遲；相關性本身不證明因果。",
+      "choices": [],
+      "default": "0",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 0,
+      "max": 1,
+      "step": "any",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.troposphericDelay.gacosDir",
+      "label": "GACOS 資料夾",
+      "purpose": "指定事先取得、對應所有觀測日期的 GACOS 延遲資料。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定事先取得、對應所有觀測日期的 GACOS 延遲資料。",
+      "tradeoff": "須有每期相符的 GACOS 延遲檔；這是來源選擇，不代表其一定勝過 ERA5。",
+      "choices": [],
+      "default": "./GACOS",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "需具備全部保留日期的 GACOS 延遲與相符中繼資料；執行前檢查。",
+      "path_kind": "directory",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.troposphericDelay.operaDir",
+      "label": "OPERA 對流層資料夾",
+      "purpose": "指定 OPERA 對流層天頂延遲產品；需確認時空覆蓋。",
+      "group": "troposphericDelay",
+      "group_label": "對流層校正",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定 OPERA 對流層天頂延遲產品；需確認時空覆蓋。",
+      "tradeoff": "須有適用的 OPERA 延遲產品；本次確認模板存在此欄，未驗證對 ALOS-2 的實際支援或比較論文。",
+      "choices": [],
+      "default": "./OPERA",
+      "baseline": null,
+      "editable": false,
+      "status": "unsupported",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "OPERA 延遲產品的 ALOS-2 接入與產物驗證尚未完成。",
+      "sources": [
+        {
+          "title": "Doin et al. (2009)：分層對流層延遲",
+          "url": "https://doi.org/10.1016/j.jappgeo.2009.03.010"
+        },
+        {
+          "title": "Jolivet et al. (2014)：全球氣象模型大氣校正",
+          "url": "https://doi.org/10.1002/2013JB010588"
+        },
+        {
+          "title": "Hersbach et al. (2020)：ERA5 再分析資料",
+          "url": "https://doi.org/10.1002/qj.3803"
+        },
+        {
+          "title": "Yu et al. (2018)：GACOS 方法",
+          "url": "https://doi.org/10.1029/2017JB015305"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "directory",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.deramp",
+      "label": "空間坡度移除",
+      "purpose": "去除逐日期空間平面或曲面；可能同時去除長波長真實變形。",
+      "group": "deramp",
+      "group_label": "空間坡度移除",
+      "input_type": "enum",
+      "allowed": "no, linear, linear_range, linear_azimuth, quadratic, quadratic_range, quadratic_azimuth",
+      "allow_auto": true,
+      "help": "去除逐日期空間平面或曲面；可能同時去除長波長真實變形。",
+      "tradeoff": "linear 較簡單、quadratic 更靈活；兩者均可能扣掉真實長波長訊號，宜比對處理前後與穩定區。",
+      "choices": [
+        "no",
+        "linear",
+        "linear_range",
+        "linear_azimuth",
+        "quadratic",
+        "quadratic_range",
+        "quadratic_azimuth"
+      ],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintDeramp",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 同版本 objects/ramp.py:14–20 另支援只沿距離向或方位向的坡度；已包含於本清單。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.deramp.maskFile",
+      "label": "坡度估計遮罩",
+      "purpose": "指定用於估計空間坡度的可靠區域。",
+      "group": "deramp",
+      "group_label": "空間坡度移除",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定用於估計空間坡度的可靠區域。",
+      "tradeoff": "限定此步驟使用的像素或品質資訊；可靠遮罩可減少污染，過嚴或不相符遮罩會減少覆蓋或扭曲估計。須與本次格網一致。",
+      "choices": [],
+      "default": "maskTempCoh.h5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.topographicResidual",
+      "label": "DEM 誤差校正",
+      "purpose": "依垂直基線及時間模型分離殘餘高程誤差與變形。",
+      "group": "topographicResidual",
+      "group_label": "DEM 殘差校正",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "依垂直基線及時間模型分離殘餘高程誤差與變形。",
+      "tradeoff": "開啟可估計地形殘差；模型與基線條件不足時，可能與真實變形混淆。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintDem",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.topographicResidual.polyOrder",
+      "label": "DEM 校正時間模型階數",
+      "purpose": "設定估計 DEM 誤差時使用的變形模型；並非最終速度模型階數。",
+      "group": "topographicResidual",
+      "group_label": "DEM 殘差校正",
+      "input_type": "number",
+      "allowed": "整數 ≥ 1",
+      "allow_auto": true,
+      "help": "設定估計 DEM 誤差時使用的變形模型；並非最終速度模型階數。",
+      "tradeoff": "較高階容納複雜時間變化，但增加未知數與耦合；與最後 timeFunc.polynomial 是兩組設定。",
+      "choices": [],
+      "default": "2",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintDemOrder",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.topographicResidual.phaseVelocity",
+      "label": "以相位變化率估計 DEM 誤差",
+      "purpose": "選擇估計殘差高程時最小化相位變化率。",
+      "group": "topographicResidual",
+      "group_label": "DEM 殘差校正",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "選擇估計殘差高程時最小化相位變化率。",
+      "tradeoff": "改以相位變化率而非相位作為最小化對象；需考慮不等間隔日期與噪聲放大，應用資料驗證。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.topographicResidual.stepDate",
+      "label": "DEM 模型突變日期",
+      "purpose": "在 DEM 誤差估計中加入已知事件造成的位移階躍。",
+      "group": "topographicResidual",
+      "group_label": "DEM 殘差校正",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD 或 YYYYMMDDTHHMM 日期清單或 no",
+      "allow_auto": true,
+      "help": "在 DEM 誤差估計中加入已知事件造成的位移階躍。",
+      "tradeoff": "已知事件跳變可避免由 DEM 模型吸收；錯誤或過多事件日期會增加不穩定性。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "20220101,20230901T1200",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.topographicResidual.excludeDate",
+      "label": "DEM 誤差估計排除日期",
+      "purpose": "只排除估計階段的不良日期，與網路日期排除不同。",
+      "group": "topographicResidual",
+      "group_label": "DEM 殘差校正",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD 日期清單，以逗號分隔，或 no；工作台不接收排除日期文字檔。",
+      "allow_auto": true,
+      "help": "只排除估計階段的不良日期，與網路日期排除不同。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "exclude_date.txt",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "20220101,20220815",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 auto 指向 exclude_date.txt；此預設檔不存在時以空排除清單繼續，亦即不因該檔排除日期（cli/dem_error.py:102–104）。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.topographicResidual.pixelwiseGeometry",
+      "label": "逐像素幾何",
+      "purpose": "使用逐像素入射角及距離，提高幾何描述精度但可能增加計算量。",
+      "group": "topographicResidual",
+      "group_label": "DEM 殘差校正",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "使用逐像素入射角及距離，提高幾何描述精度但可能增加計算量。",
+      "tradeoff": "逐像素幾何較耗時、能反映空間差異；平均幾何較快但忽略區內差異。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.residualRMS.maskFile",
+      "label": "殘差評估遮罩",
+      "purpose": "指定計算殘差品質統計的可靠範圍。",
+      "group": "residualRMS",
+      "group_label": "殘差品質評估",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "指定計算殘差品質統計的可靠範圍。",
+      "tradeoff": "限定此步驟使用的像素或品質資訊；可靠遮罩可減少污染，過嚴或不相符遮罩會減少覆蓋或扭曲估計。須與本次格網一致。",
+      "choices": [],
+      "default": "maskTempCoh.h5",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.residualRMS.deramp",
+      "label": "殘差評估去坡度",
+      "purpose": "在殘差評估時去除長波長部分；不等於最終時序去坡度。",
+      "group": "residualRMS",
+      "group_label": "殘差品質評估",
+      "input_type": "enum",
+      "allowed": "no, linear, linear_range, linear_azimuth, quadratic, quadratic_range, quadratic_azimuth",
+      "allow_auto": true,
+      "help": "在殘差評估時去除長波長部分；不等於最終時序去坡度。",
+      "tradeoff": "先去背景斜坡再評估殘差可聚焦短尺度差異；可能低估長波長問題。這不是最終位移的 deramp 開關。",
+      "choices": [
+        "no",
+        "linear",
+        "linear_range",
+        "linear_azimuth",
+        "quadratic",
+        "quadratic_range",
+        "quadratic_azimuth"
+      ],
+      "default": "quadratic",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 同版本 objects/ramp.py:14–20 另支援只沿距離向或方位向的坡度；已包含於本清單。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.residualRMS.cutoff",
+      "label": "異常日期門檻",
+      "purpose": "控制以殘差與穩健離散程度辨識異常日期的門檻。",
+      "group": "residualRMS",
+      "group_label": "殘差品質評估",
+      "input_type": "number",
+      "allowed": "非負實數",
+      "allow_auto": true,
+      "help": "控制以殘差與穩健離散程度辨識異常日期的門檻。",
+      "tradeoff": "較低異常門檻較嚴格，也可能排除模型尚未解釋的真實事件；應人工確認候選日期。",
+      "choices": [],
+      "default": "3",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2013)：DEM 誤差校正",
+          "url": "https://doi.org/10.1109/TGRS.2012.2227761"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "min": 0,
+      "max": null,
+      "step": "any",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.reference.date",
+      "label": "時間參考日期",
+      "purpose": "指定時序零點；改變相對位移基準而非恢復絕對位移。",
+      "group": "reference",
+      "group_label": "空間與時間參考",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD、參考日期文字檔路徑或 no",
+      "allow_auto": true,
+      "help": "指定時序零點；改變相對位移基準而非恢復絕對位移。",
+      "tradeoff": "改變位移零點；噪聲大的日期可能把偏差帶入各期相對位移。不是修改實際觀測日期。",
+      "choices": [],
+      "default": "reference_date.txt",
+      "baseline": null,
+      "editable": false,
+      "status": "basic",
+      "tier": "basic",
+      "basic_control": "mintReference",
+      "disabled_reason": "請使用常用設定中對應欄位；同一參數不能在兩处重複設定。",
+      "sources": [
+        {
+          "title": "Yunjun et al. (2019)：MintPy、解纏與降噪",
+          "url": "https://doi.org/10.1016/j.cageo.2019.104331"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 auto 讀取 reference_date.txt；檔案不存在時略過更換時間參考日期，保留時序目前的參考基準，不是任意重新選一天（reference_date.py:31–42）。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.timeFunc.startDate",
+      "label": "模型擬合開始日期",
+      "purpose": "選擇最終時間函數擬合的資料期間，不必重建干涉網路。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD 或 no",
+      "allow_auto": true,
+      "help": "選擇最終時間函數擬合的資料期間，不必重建干涉網路。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "20220101",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.endDate",
+      "label": "模型擬合結束日期",
+      "purpose": "選擇最終時間函數擬合的資料期間。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD 或 no",
+      "allow_auto": true,
+      "help": "選擇最終時間函數擬合的資料期間。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "20221231",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.excludeDate",
+      "label": "模型擬合排除日期",
+      "purpose": "排除最終時間函數擬合中的指定日期。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "structured",
+      "allowed": "YYYYMMDD 日期清單，以逗號分隔，或 no；工作台不接收排除日期文字檔。",
+      "allow_auto": true,
+      "help": "排除最終時間函數擬合中的指定日期。",
+      "tradeoff": "可排除不適用或可疑觀測、限定分析期間；代價是減少日期與時間支撐。不同階段的排除用途不同，應保留理由並重新檢查網路／模型。",
+      "choices": [],
+      "default": "exclude_date.txt",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "20220101,20220815",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 auto 指向 exclude_date.txt；日期清單讀取器對不存在的 .txt／.cfg／.dat 檔不加入排除日期，預設缺檔因此不因該檔排除日期（utils/ptime.py:388–396；timeseries2velocity.py:95–99）。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.polynomial",
+      "label": "時間多項式階數",
+      "purpose": "1 為線性速度；更高階可擬合加速等行為，但需要足夠觀測。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "number",
+      "allowed": "整數 ≥ 1；工作台速度成果需有線性係數。MintPy 獨立工具可用 0。",
+      "allow_auto": true,
+      "help": "1 為線性速度；更高階可擬合加速等行為，但需要足夠觀測。",
+      "tradeoff": "一次是線性趨勢，二次等可描述曲率；階數增加耗費自由度，不代表物理模型更正確。",
+      "choices": [],
+      "default": "1",
+      "baseline": "1",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "執行前檢查日期數、設計矩陣秩與正的殘差自由度。",
+      "min": 1,
+      "max": null,
+      "step": 1,
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.timeFunc.periodic",
+      "label": "週期訊號",
+      "purpose": "加入以年為單位的週期，例如年週期與半年週期；需足夠時間跨度。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "structured",
+      "allowed": "正數週期清單，單位為年，或 no",
+      "allow_auto": true,
+      "help": "加入以年為單位的週期，例如年週期與半年週期；需足夠時間跨度。",
+      "tradeoff": "年／半年等週期能描述季節訊號；稀疏或季節偏斜取樣易混淆趨勢及大氣週期。每個週期增加兩個係數。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "1,0.5",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.stepDate",
+      "label": "位移突變日期",
+      "purpose": "加入已知地震等事件時間的階躍項。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "structured",
+      "allowed": "事件日期／時間清單或 no",
+      "allow_auto": true,
+      "help": "加入已知地震等事件時間的階躍項。",
+      "tradeoff": "對已知突發事件建模；需要事件前後觀測支撐，多個跳變可能難區分。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "20220101,20230901T1200",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.exp",
+      "label": "指數衰減項",
+      "purpose": "以事件日期與時間常數描述暫態變形；多參數可能難以區分。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "structured",
+      "allowed": "事件日期,正整數天數[,另一時間常數]；多事件用分號分隔，或 no。",
+      "allow_auto": true,
+      "help": "以事件日期與時間常數描述暫態變形；多參數可能難以區分。",
+      "tradeoff": "指數衰減適用於有物理理由的暫態；需要指定起始日及時間尺度，避免由稀疏資料過度解釋。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "20220101,60,120;20230901,90",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.log",
+      "label": "對數暫態項",
+      "purpose": "以事件日期與時間常數描述暫態變形。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "structured",
+      "allowed": "事件日期,正整數天數[,另一時間常數]；多事件用分號分隔，或 no。",
+      "allow_auto": true,
+      "help": "以事件日期與時間常數描述暫態變形。",
+      "tradeoff": "對數暫態可表達部分震後過程；需適當觀測跨度，與趨勢／指數項可能高度相關。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "20220101,60,120;20230901,90",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.uncertaintyQuantification",
+      "label": "模型不確定度方法",
+      "purpose": "residue 使用擬合殘差；covariance 使用外部觀測變異數；bootstrap 重抽樣估計。工作台的 covariance 僅支援逐日期 N×Y×X 對角變異數，完整 4D 共變異數尚未支援。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "enum",
+      "allowed": "residue, covariance, bootstrap",
+      "allow_auto": true,
+      "help": "residue 使用擬合殘差；covariance 使用外部觀測變異數；bootstrap 重抽樣估計。工作台的 covariance 僅支援逐日期 N×Y×X 對角變異數，完整 4D 共變異數尚未支援。",
+      "tradeoff": "residue 快但依殘差假設；covariance 需可信協方差；bootstrap 較耗時且獨立重抽樣不能自動處理時間相關噪聲。",
+      "choices": [
+        "residue",
+        "covariance",
+        "bootstrap"
+      ],
+      "default": "residue",
+      "baseline": "residue",
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "covariance 需另選擇相符 date 與 UNIT=m^2 的 HDF5 檔案；bootstrap 僅支援純線性速度模型且次數大於 1。執行前檢查資料與模型，不會默默切換方法。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.timeFunc.timeSeriesCovFile",
+      "label": "逐日期變異數檔案（對角形式）",
+      "purpose": "提供時序觀測的逐日期變異數，用於 covariance 不確定度估計。本版工作台僅支援 N×Y×X 對角變異數 HDF5；需有與分析日期順序一致的 date 資料集及 UNIT=m^2。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "path",
+      "allowed": "檔案／資料夾路徑；堆疊檔案可使用路徑模式，部分可選資料接受 no",
+      "allow_auto": true,
+      "help": "提供時序觀測的逐日期變異數，用於 covariance 不確定度估計。本版工作台僅支援 N×Y×X 對角變異數 HDF5；需有與分析日期順序一致的 date 資料集及 UNIT=m^2。",
+      "tradeoff": "可使用外部估計的逐日期觀測變異數，但本版只傳遞對角項，未涵蓋跨日期相關性。結果仍依賴變異數來源的可靠性；檔案與位移標準差不是同一種量。",
+      "choices": [],
+      "default": "no",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "/path/to/data.h5",
+      "conditions": "必須是非負、有限值、相符格網與日期的變異數。完整 4D 共變異數矩陣尚未支援；缺少有效檔案時阻止執行，不會默默改成殘差法。",
+      "path_kind": "file",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.timeFunc.bootstrapCount",
+      "label": "Bootstrap 次數",
+      "purpose": "增加重抽樣次數可降低蒙地卡羅波動，但增加運算量。",
+      "group": "timeFunc",
+      "group_label": "時間模型與不確定度",
+      "input_type": "number",
+      "allowed": "整數 > 1",
+      "allow_auto": true,
+      "help": "增加重抽樣次數可降低蒙地卡羅波動，但增加運算量。",
+      "tradeoff": "增加次數可減少抽樣結果的 Monte Carlo 波動，但耗時增加，不能彌補日期太少或錯誤噪聲假設。",
+      "choices": [],
+      "default": "400",
+      "baseline": null,
+      "editable": true,
+      "status": "editable",
+      "tier": "advanced",
+      "basic_control": null,
+      "disabled_reason": "",
+      "sources": [
+        {
+          "title": "Hetland et al. (2012)：時間函數建模",
+          "url": "https://doi.org/10.1029/2011JB008731"
+        },
+        {
+          "title": "Fattahi & Amelung (2015)：大氣偏差與不確定度",
+          "url": "https://doi.org/10.1002/2015JB012419"
+        },
+        {
+          "title": "Agram & Simons (2015)：InSAR 時序噪聲模型",
+          "url": "https://doi.org/10.1002/2014JB011271"
+        },
+        {
+          "title": "MintPy 時間模型與參數計數原始碼",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/utils/time_func.py"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 此版本若次數不大於 1，MintPy 會警告並退回 residue；介面應先阻擋此無效設定（cli/timeseries2velocity.py:151–156）。",
+      "min": 2,
+      "max": null,
+      "step": 1,
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.geocode",
+      "label": "地理編碼",
+      "purpose": "將雷達網格成果轉到地理座標；已有地理座標者不需要重複轉換。",
+      "group": "geocode",
+      "group_label": "地理編碼",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "將雷達網格成果轉到地理座標；已有地理座標者不需要重複轉換。",
+      "tradeoff": "提供地理網格便於 GIS 分析；會增加輸出與重採樣步驟，雷達原始成果仍應保留。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": "no",
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台另有地理編碼與 GeoTIFF 匯出；此原生輸出流程尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.geocode.SNWE",
+      "label": "地理編碼輸出範圍",
+      "purpose": "設定地理編碼產物的南北西東界線，不等同載入階段裁切。",
+      "group": "geocode",
+      "group_label": "地理編碼",
+      "input_type": "structured",
+      "allowed": "南,北,西,東（度）或 none",
+      "allow_auto": true,
+      "help": "設定地理編碼產物的南北西東界線，不等同載入階段裁切。",
+      "tradeoff": "限制地理輸出範圍可省空間；與載入時裁切不同，不能追回已在輸入階段裁掉的資料。",
+      "choices": [],
+      "default": "none",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台另有地理編碼與 GeoTIFF 匯出；此原生輸出流程尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.geocode.laloStep",
+      "label": "地理編碼輸出間距",
+      "purpose": "設定緯度、經度方向的度數間距；更細格網不會新增觀測解析度。",
+      "group": "geocode",
+      "group_label": "地理編碼",
+      "input_type": "structured",
+      "allowed": "緯度間距,經度間距（度）或 none",
+      "allow_auto": true,
+      "help": "設定緯度、經度方向的度數間距；更細格網不會新增觀測解析度。",
+      "tradeoff": "較細輸出格網便於疊圖但增加體積，不增加原始資訊；經緯度角度與公尺距離會隨緯度變化。",
+      "choices": [],
+      "default": "none",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台另有地理編碼與 GeoTIFF 匯出；此原生輸出流程尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.geocode.interpMethod",
+      "label": "地理編碼內插",
+      "purpose": "選擇最近鄰或線性內插；平滑外觀與原始像素數值保留存在取捨。",
+      "group": "geocode",
+      "group_label": "地理編碼",
+      "input_type": "enum",
+      "allowed": "nearest, linear",
+      "allow_auto": true,
+      "help": "選擇最近鄰或線性內插；平滑外觀與原始像素數值保留存在取捨。",
+      "tradeoff": "nearest 保留來源值，linear 平滑但混合鄰近值；可用方法受重採樣後端與版本限制。",
+      "choices": [
+        "nearest",
+        "linear"
+      ],
+      "default": "nearest",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台另有地理編碼與 GeoTIFF 匯出；此原生輸出流程尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。 模板只列 nearest；已由同版本 cli/geocode.py:83 核對亦接受 linear。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.geocode.fillValue",
+      "label": "地理編碼無資料值",
+      "purpose": "設定無可用觀測位置的填充值；0 可能與真實零位移混淆。",
+      "group": "geocode",
+      "group_label": "地理編碼",
+      "input_type": "structured",
+      "allowed": "數字或 np.nan",
+      "allow_auto": true,
+      "help": "設定無可用觀測位置的填充值；0 可能與真實零位移混淆。",
+      "tradeoff": "NaN／NoData 適合區分缺值；若用 0，後續須確保不把缺資料誤判成零位移。",
+      "choices": [],
+      "default": "np.nan",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台另有地理編碼與 GeoTIFF 匯出；此原生輸出流程尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        },
+        {
+          "title": "MintPy 官方參數範本（main；可能與本機版本不同）",
+          "url": "https://github.com/insarlab/MintPy/blob/main/src/mintpy/defaults/smallbaselineApp.cfg"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.save.kmz",
+      "label": "輸出 Google Earth KMZ",
+      "purpose": "將地理編碼速度圖輸出供 Google Earth 檢視。",
+      "group": "save",
+      "group_label": "成果格式",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "將地理編碼速度圖輸出供 Google Earth 檢視。",
+      "tradeoff": "利於 Google Earth 檢視，但需地理編碼；瀏覽圖不應取代原始科學陣列。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": "no",
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台管理分析產物與下載；此 MintPy 原生輸出尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.save.hdfEos5",
+      "label": "輸出 HDF-EOS5",
+      "purpose": "以指定地球觀測格式保存時序成果。",
+      "group": "save",
+      "group_label": "成果格式",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "以指定地球觀測格式保存時序成果。",
+      "tradeoff": "結構化保存時序與 metadata，增加儲存需求；視後續共享規範選擇。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": "no",
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台管理分析產物與下載；此 MintPy 原生輸出尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.save.hdfEos5.update",
+      "label": "HDF-EOS5 更新命名",
+      "purpose": "在檔名中保留可持續更新的結束日期標記。",
+      "group": "save",
+      "group_label": "成果格式",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "在檔名中保留可持續更新的結束日期標記。",
+      "tradeoff": "影響輸出命名慣例，不是工作台自動續跑或自動追加日期的保證。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台管理分析產物與下載；此 MintPy 原生輸出尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.save.hdfEos5.subset",
+      "label": "HDF-EOS5 範圍命名",
+      "purpose": "在檔名中包含裁切範圍資訊。",
+      "group": "save",
+      "group_label": "成果格式",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "在檔名中包含裁切範圍資訊。",
+      "tradeoff": "檔名記錄裁切範圍有助辨識，但不能取代完整參數與來源紀錄。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "no",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台管理分析產物與下載；此 MintPy 原生輸出尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.plot",
+      "label": "產生 MintPy 標準圖",
+      "purpose": "控制標準處理結果的批次繪圖，與工作台互動地圖分開。",
+      "group": "plot",
+      "group_label": "標準繪圖",
+      "input_type": "boolean",
+      "allowed": "yes, no",
+      "allow_auto": true,
+      "help": "控制標準處理結果的批次繪圖，與工作台互動地圖分開。",
+      "tradeoff": "自動批次出圖有助檢查，但增加時間與空間；工作台已有互動繪圖可另行保留。",
+      "choices": [
+        "yes",
+        "no"
+      ],
+      "default": "yes",
+      "baseline": "no",
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台提供互動地圖與曲線；此原生批次繪圖尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": true
+    },
+    {
+      "key": "mintpy.plot.dpi",
+      "label": "圖檔 DPI",
+      "purpose": "控制輸出圖檔解析度。",
+      "group": "plot",
+      "group_label": "標準繪圖",
+      "input_type": "number",
+      "allowed": "正整數",
+      "allow_auto": true,
+      "help": "控制輸出圖檔解析度。",
+      "tradeoff": "高 DPI 適合出版但圖檔更大；不會提升原始雷達解析度。",
+      "choices": [],
+      "default": "150",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台提供互動地圖與曲線；此原生批次繪圖尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    },
+    {
+      "key": "mintpy.plot.maxMemory",
+      "label": "單次繪圖記憶體",
+      "purpose": "控制單次 view.py 繪圖的記憶體預算。",
+      "group": "plot",
+      "group_label": "標準繪圖",
+      "input_type": "number",
+      "allowed": "正實數，GB",
+      "allow_auto": true,
+      "help": "控制單次 view.py 繪圖的記憶體預算。",
+      "tradeoff": "較大記憶體可繪製較完整細節，並行繪圖時須考慮多個程序的總量。",
+      "choices": [],
+      "default": "4",
+      "baseline": null,
+      "editable": false,
+      "status": "managed",
+      "tier": "all",
+      "basic_control": null,
+      "disabled_reason": "工作台提供互動地圖與曲線；此原生批次繪圖尚未接入。",
+      "sources": [
+        {
+          "title": "MintPy 官方主流程說明",
+          "url": "https://mintpy.readthedocs.io/en/latest/"
+        }
+      ],
+      "placeholder": "",
+      "conditions": "auto 表示採用所選 MintPy 版本的預設；不等於停用。",
+      "allow_no": false
+    }
+  ]
+}
