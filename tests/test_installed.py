@@ -21,8 +21,12 @@ class InstalledGeneratorTest(unittest.TestCase):
             engine.run(state,['python','-c','import json,os,shutil; json.dump(dict(mdx=shutil.which("mdx"),isce_home=os.environ["ISCE_HOME"],python=shutil.which("python")),open("tools.json","w"))'],conda=True)
             result=json.loads((root/'proc/tools.json').read_text())
             plotting=Path(__file__).resolve().parents[1]/'.runtime/bin/mdx'
-            expected=plotting if plotting.is_file() else Path(result['isce_home'])/'bin/mdx'
+            managed=Path(os.environ.get('SAR_WORKBENCH_HOME',str(Path.home()/'sar-workbench')))/'runtime/envs'
+            private=managed.resolve() in env.resolve().parents
+            expected=(env/'bin/mdx') if (env/'bin/mdx').is_file() else Path(result['isce_home'])/'bin/mdx'
+            if plotting.is_file() and not private: expected=plotting
             self.assertEqual(result['mdx'],str(expected))
+            if private: self.assertIn(env.resolve(),Path(result['mdx']).resolve().parents)
             self.assertEqual(result['python'],str(env/'bin/python'))
     def test_shebang_uses_selected_python_when_environment_already_active(self):
         env=Path(os.environ['ALOSSTACK_TEST_ENV'])

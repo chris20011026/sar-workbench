@@ -129,7 +129,11 @@ class Engine:
             # reactivates an already-active environment with another Python first.
             plotting_bin = Path(__file__).resolve().parents[2]/'.runtime/bin'
             plotting_path = str(plotting_bin) if all((plotting_bin/x).is_file() for x in ('mdx','montage','convert')) else ''
-            if c.get('workflow')=='alos2App':plotting_path=''
+            managed = Path(os.environ.get('SAR_WORKBENCH_HOME', str(Path.home()/'sar-workbench')))/'runtime/envs'
+            # The managed distribution supplies its own native rendering tools.
+            # A legacy checkout's optional compatibility shim must not override them.
+            if c.get('workflow')=='alos2App' or managed.resolve() in Path(c['env']).resolve().parents:
+                plotting_path=''
             wrapper = ': "${ISCE_HOME:?ISCE_HOME is not set by the selected environment}"; export PATH="${3:+$3:}$2/bin:$1:$ISCE_HOME/bin:$ISCE_HOME/applications:$PATH"; shift 3; exec "$@"'
             args = [c['conda'], 'run', '--no-capture-output', '-p', c['env'],
                     '/bin/bash', '-c', wrapper, 'alos-helper', stack, c['env'], plotting_path, *map(str, args)]
