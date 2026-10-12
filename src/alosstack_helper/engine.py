@@ -307,6 +307,8 @@ class Engine:
                         s['looks'], _ = parse_cmd3(text)
                         s['expected_ion_pairs'] = declared_pairs(text, 'ionpair')
                         names.append('helper_cmd3_before_review.sh')
+                    from .confirmation import compare_generated
+                    compare_generated(s,proc,meta)
                     for file in [proc/name for name in names if name.endswith('.sh')]:
                         self.run(s, ['/bin/bash', '-n', str(file)])
                     s['hashes'] = {name: digest(proc/name) for name in names}

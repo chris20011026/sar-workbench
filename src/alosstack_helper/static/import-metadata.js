@@ -5,8 +5,8 @@
  const prettyDate=d=>'20'+d.slice(0,2)+'-'+d.slice(2,4)+'-'+d.slice(4,6);
  const colors=['#236e62','#bc6b2c','#526cb3','#99559b','#748129','#318aa1'];
  window.clearImportMap=()=>{if(map){map.remove();map=null;}};
- window.renderImportMetadata=(data,selectGroup)=>{
-  window.clearImportMap();const target=$('importInventory');target.replaceChildren();
+ window.renderImportMetadata=(data,selectGroup,targetOverride)=>{
+  window.clearImportMap();const target=targetOverride||$('importInventory');target.replaceChildren();
   const metadata=data.metadata,products=metadata?.products||[];
   const selectedProducts=[];
   const wrap=node('div',undefined,'onboard-table'),table=node('table'),head=node('tr');

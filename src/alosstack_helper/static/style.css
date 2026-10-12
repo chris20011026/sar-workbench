@@ -16,3 +16,13 @@
 @media(max-width:1200px){.mint-design-grid{grid-template-columns:minmax(0,1fr)}.mint-network-panel{margin-top:0}.mint-network-panel .pair-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.mint-heading{flex-wrap:wrap}.mint-correction-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:820px){.mint-editor-grid{grid-template-columns:minmax(0,1fr)}.mint-catalog-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.mint-catalog-tools label:first-child{grid-column:1/-1}.mint-settings-tabs button{padding:10px;font-size:12px}.mint-settings-tabs small{font-size:10px}.mint-submit{position:static;flex-direction:column;align-items:stretch;gap:12px}.mint-submit button{width:100%}.mint-correction-grid{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:520px){.mint-settings-tabs{gap:4px;padding:4px}.mint-settings-tabs small{display:none}.mint-settings-tabs button{text-align:center;padding:12px 3px}.mint-heading h2{font-size:21px}.mint-heading .badge{white-space:normal}.mint-catalog-tools{grid-template-columns:minmax(0,1fr)}.mint-network-panel{padding:16px}.mint-network-panel .pair-choices{grid-template-columns:minmax(0,1fr)}.mint-catalog-row-top{flex-direction:column;gap:10px}.mint-catalog-action{width:100%;justify-content:space-between}.mint-catalog-row,.mint-editor-grid{padding-left:15px;padding-right:15px}.mint-setting-group>summary,.mint-catalog-group>summary{padding:15px}.mint-run-report{padding:16px}}
+
+/* Processing confirmation: readable review before committing a project. */
+#preflightDialog,.confirmation-dialog{width:min(1060px,94vw);max-width:94vw;max-height:90vh;overflow:auto;padding:30px;border:1px solid #ccd8cc;border-radius:18px}
+.confirmation-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}
+.confirmation-stat{background:#edf2e9;padding:16px;border-radius:12px;display:flex;flex-direction:column;gap:7px}
+.confirmation-stat strong{font-size:1.25rem}.confirmation-stat small{color:#546b60}
+.confirmation-network{margin:18px 0}.confirmation-plot{width:100%;min-height:300px}
+.confirmation-network details{max-height:280px;overflow:auto}.confirmation-network table{width:100%;border-collapse:collapse}.confirmation-network td,.confirmation-network th{padding:8px;text-align:left;border-bottom:1px solid #dee5dc}
+#preflightDialog dl,.confirmation-dialog dl{overflow-wrap:anywhere}#preflightDialog details,.confirmation-dialog details{margin:18px 0}
+@media(max-width:650px){.confirmation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#preflightDialog,.confirmation-dialog{padding:16px}}

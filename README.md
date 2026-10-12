@@ -13,7 +13,7 @@
 | Sentinel-1 topsApp / topsStack | 規劃中 |
 | Stripmap stripmapApp / stripmapStack | 規劃中 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.4) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.5) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
 [第一次使用指南](docs/FIRST_USE.md) · [0.6 更新與驗證方式](docs/RELEASE_0.6.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
@@ -235,3 +235,7 @@ MintPy 分析表單分為三個頁籤，沿用既有的載入 → 確認參考�
 - 合成線性＋年週期時序驗證原生 MintPy 能回復已知的 4 mm/year 線性係數；另測參數注入、無效型別、日期／模型不足、網路失聯、缺少外部資料、遮罩與來源變更、校正狀態及模型標籤。
 - 100 項測試中 97 項通過，3 項需額外指定 ISCE 環境的案例跳過。桌面與 390px 手機版驗證參數搜尋、設定跳轉、複製進階值、校正報告；無 JavaScript 錯誤或水平溢出。套件建置確認包含完整參數目錄與介面資源。
 - 正式專案沒有啟動新的反演，原 Conda 環境沒有修改。此驗證不涵蓋所有 SAR 資料、所有 MintPy 版本或所有校正組合。GACOS / ERA5 實際大氣產品及各種解纏修正仍需用適合的研究資料比較驗證。
+
+### 開始處理前先確認
+
+建立 ALOS-2 多日期專案時，新增[專案確認頁](docs/PROJECT_CONFIRMATION.md)，集中預覽兩種配對網路、影像覆蓋、實際解析設定與資料健檢。舊專案可由「查看處理確認紀錄」查看原有配對。

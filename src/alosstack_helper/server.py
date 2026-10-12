@@ -24,6 +24,7 @@ from .terrain import plan_terrain
 from .core import atomic_json
 from .preflight import check_project, require_preflight
 from .recovery import Recovery
+from .confirmation import Confirmations, saved_review, verify_saved_inputs
 
 STATIC = Path(__file__).parent/'static'
 
@@ -43,6 +44,7 @@ def make_server(engine, port=8765):
     token = secrets.token_urlsafe(32)
     analyses = Analyses(engine)
     onboarding = Onboarding()
+    confirmations = Confirmations()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
         def send(self, value, status=200, mime='application/json'):
@@ -63,7 +65,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -153,6 +155,8 @@ def make_server(engine, port=8765):
                 if self.path == '/api/template': return self.send({'properties':read_template(d['path'])})
                 if self.path == '/api/scan': return self.send({'dates':inspect_data(d['path'])})
                 if self.path == '/api/preflight': return self.send(check_project(d))
+                if self.path == '/api/confirmation': return self.send(confirmations.preview(d))
+                if self.path == '/api/confirmation-saved': return self.send(saved_review(engine,d['id']))
                 if self.path == '/api/project-check':
                     s = engine.get(d['id'])
                     return self.send(check_project(s['config'], existing=True))
@@ -160,9 +164,11 @@ def make_server(engine, port=8765):
                     if type(d.get('enabled')) is not bool: raise ValueError('請選擇是否啟用保護。')
                     engine.recovery_enable(d['id'],d['enabled']); return self.send({'ok':True})
                 if self.path == '/api/create':
+                    confirmation = confirmations.validate(d) if d.get('confirmation_id') else None
                     report = require_preflight(d)
                     s = engine.create(d)
                     atomic_json(engine.paths(s)[2]/'preflight.json', report)
+                    if confirmation: atomic_json(engine.paths(s)[2]/'confirmation.json',confirmation)
                     return self.send(s)
                 if self.path == '/api/analysis-create': return self.send(analyses.create(d['id'],d['kind'],d))
                 if self.path == '/api/analysis-invert': return self.send(analyses.invert(d['id'],d['run'],d))
@@ -178,6 +184,8 @@ def make_server(engine, port=8765):
                     if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover'):
                         report = require_preflight(s['config'], existing=True)
                         atomic_json(engine.paths(s)[2]/'preflight.json', report)
+                    if d['action'] in ('prepare','run'):
+                        verify_saved_inputs(s,engine.paths(s)[2])
                     engine.launch(d['id'],d['action'],d.get('excluded'),d); return self.send({'ok':True})
                 if self.path == '/api/stop': engine.stop(); return self.send({'ok':True})
                 return self.send({'error':'Not found'},404)
