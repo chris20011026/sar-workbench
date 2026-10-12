@@ -20,8 +20,9 @@ def find_conda(prefix):
     managed = Path(os.environ.get('SAR_WORKBENCH_HOME', str(Path.home() / 'sar-workbench'))) / 'runtime'
     candidates = []
     if managed.resolve() in prefix.parents:
-        candidates.append(managed / 'miniforge/bin/conda')
-    candidates += [prefix.parent.parent / 'bin/conda', Path.home() / 'miniconda3/bin/conda',
+        conda = managed / 'miniforge/bin/conda'
+        return str(conda) if conda.is_file() else None
+    candidates += [prefix / 'bin/conda', prefix.parent.parent / 'bin/conda', Path.home() / 'miniconda3/bin/conda',
                    Path.home() / 'miniforge3/bin/conda']
     return next((str(p) for p in candidates if p.is_file()), shutil.which('conda'))
 

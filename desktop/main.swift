@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var location: NSTextField!
     var button: NSButton!
     var choose: NSButton!
+    var uninstall: NSButton!
     var progress: NSProgressIndicator!
     var bootstrap: Bootstrap!
     var home = initialHome
@@ -37,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu(); let item = NSMenuItem(); menu.addItem(item)
         let appMenu = NSMenu(); appMenu.addItem(withTitle: "結束 SAR 工作台", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.submenu = appMenu; NSApp.mainMenu = menu
-        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 450),
+        window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 510),
                           styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "SAR 研究工作台"; window.center(); window.delegate = self
         let stack = NSStackView(); stack.orientation = .vertical; stack.alignment = .leading; stack.spacing = 20
@@ -58,10 +59,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         stack.addArrangedSubview(progress)
         button = NSButton(title: "準備並開啟工作台", target: self, action: #selector(start))
         button.bezelStyle = .rounded; button.keyEquivalent = "\r"; stack.addArrangedSubview(button)
-        let note = NSTextField(wrappingLabelWithString: "程式在本機運作。安裝進度與教學將在瀏覽器顯示；之後雙擊此 App 即可開啟。")
+        uninstall = NSButton(title: "解除安裝運算工具…", target: self, action: #selector(removeTools)); stack.addArrangedSubview(uninstall)
+        let note = NSTextField(wrappingLabelWithString: "程式在本機運作。按上方按鈕開啟瀏覽器。解除安裝只移動專用工具與快取，保留研究資料；運作中請先結束 App 再重新開啟。")
         note.textColor = .secondaryLabelColor; stack.addArrangedSubview(note)
         window.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true)
-        if FileManager.default.isExecutableFile(atPath: home.appendingPathComponent("runtime/miniforge/bin/python").path) { start() }
+    }
+
+    @objc func removeTools() {
+        guard !running else { return }
+        do {
+            let state = URL(fileURLWithPath: argument("--state-dir") ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".local/share/alosstack-helper").path)
+            let plan = try UninstallPlan(home: home, state: state)
+            let alert = NSAlert(); alert.messageText = "解除安裝工作台的運算工具？"
+            alert.informativeText = "將移至垃圾桶：\n\(plan.runtime.path)\n\n包含專用 ISCE2／MintPy／SNAPHU、啟動環境、下載快取與驗證紀錄。\n\n保留專案、匯入資料、DEM／WBD、分析成果與外部 conda 環境。使用這組工具的專案需重新安裝後才能繼續运算。請先停止自行在終端機使用這組專用環境的工作。\n\n清空垃圾桶前仍可復原。"
+            alert.addButton(withTitle: "取消"); alert.addButton(withTitle: "移至垃圾桶")
+            guard alert.runModal() == .alertSecondButtonReturn else { return }
+            var destination: NSURL?
+            try FileManager.default.trashItem(at: plan.runtime, resultingItemURL: &destination)
+            withExtendedLifetime(plan) {}
+            text.stringValue = "運算工具已移至垃圾桶，研究資料保留。可按「準備並開啟工作台」重新安裝；若不再使用，可把此 App 移到垃圾桶。清空垃圾桶才會釋放空間。"
+        } catch { text.stringValue = error.localizedDescription }
     }
 
     @objc func changeLocation() {
@@ -77,7 +94,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func start() {
         if let url = url { NSWorkspace.shared.open(url); return }
         guard !running else { return }
-        running = true; button.isEnabled = false; choose.isEnabled = false; progress.startAnimation(nil)
+        running = true; button.isEnabled = false; choose.isEnabled = false; uninstall.isEnabled = false; progress.startAnimation(nil)
         activity = ProcessInfo.processInfo.beginActivity(options: [.userInitiated, .idleSystemSleepDisabled], reason: "準備 SAR 工作台")
         bootstrap = Bootstrap(home: home, resources: resources)
         bootstrap.report = { message in DispatchQueue.main.async { self.text.stringValue = message } }
@@ -89,7 +106,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
                 DispatchQueue.main.async {
                     self.text.stringValue = error.localizedDescription
                     self.running = false; self.button.title = "重試"; self.button.isEnabled = true
-                    self.choose.isEnabled = true; self.progress.stopAnimation(nil); self.bootstrap = nil
+                    self.choose.isEnabled = true; self.uninstall.isEnabled = true; self.progress.stopAnimation(nil); self.bootstrap = nil
                     if let activity = self.activity { ProcessInfo.processInfo.endActivity(activity); self.activity = nil }
                 }
             }

@@ -17,13 +17,15 @@ final class Bootstrap {
     var python: URL { runtime.appendingPathComponent("miniforge/bin/python") }
 
     func cleanEnvironment() -> [String: String] {
-        let prefixes = ["PYTHON", "CONDA", "MAMBA", "DYLD_", "ISCE", "GDAL", "PROJ", "FONTCONFIG", "MAGICK_", "_INSAR_ARM_"]
-        var env = ProcessInfo.processInfo.environment.filter { key, _ in !prefixes.contains(where: key.hasPrefix) }
+        let prefixes = ["PYTHON", "CONDA", "MAMBA", "DYLD_", "LD_", "ISCE", "GDAL", "PROJ", "MPL", "FONTCONFIG", "MAGICK_", "_INSAR_ARM_", "_CE_", "CFLAGS", "LDFLAGS"]
+        var env = ProcessInfo.processInfo.environment.filter { key, _ in !prefixes.contains(where: key.hasPrefix) && !["BASH_ENV", "ENV", "VIRTUAL_ENV"].contains(key) }
         env["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
         env["PYTHONNOUSERSITE"] = "1"
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         env["CONDA_REGISTER_ENVS"] = "false"
         env["CONDA_NUMBER_CHANNEL_NOTICES"] = "0"
+        env["CONDARC"] = "/dev/null"
+        env["MPLBACKEND"] = "Agg"
         env["XDG_CACHE_HOME"] = runtime.appendingPathComponent("cache").path
         env["SAR_WORKBENCH_HOME"] = home.path
         env["PYTHONPATH"] = resources.appendingPathComponent("src").path
@@ -62,6 +64,13 @@ final class Bootstrap {
     func prepare() throws {
         try checkPlatform()
         if lockFD < 0 { try acquireLock() }
+        let owner = runtime.appendingPathComponent("workbench-owner.json")
+        // Only claim a new directory; existing beta 1 installations are
+        // recognized by their verified bootstrap marker during removal.
+        let existing = try FileManager.default.contentsOfDirectory(atPath: runtime.path)
+        if existing.allSatisfy({ ["desktop.lock", "install.lock", "usage.lock"].contains($0) }) {
+            try JSONSerialization.data(withJSONObject: ["product":"sar-workbench", "runtime":runtime.standardizedFileURL.path]).write(to: owner, options: .atomic)
+        }
         let manifestURL = resources.appendingPathComponent("src/alosstack_helper/resources/runtime.json")
         let manifest = try JSONSerialization.jsonObject(with: Data(contentsOf: manifestURL)) as! [String: Any]
         let mini = manifest["miniforge"] as! [String: String]

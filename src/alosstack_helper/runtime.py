@@ -18,6 +18,7 @@ import time
 import uuid
 
 from .core import atomic_json, safe_path
+from .environment import isolated_env
 
 RESOURCES = Path(__file__).parent / 'resources'
 MANIFEST = json.loads((RESOURCES / 'runtime.json').read_text())
@@ -41,9 +42,7 @@ def workbench_home():
 
 def private_env(home):
     """Do not inherit Python, Conda, compiler or library settings from a shell."""
-    env = {k: v for k, v in os.environ.items()
-           if not k.startswith(('PYTHON', 'CONDA', 'MAMBA', 'DYLD_', 'ISCE', 'GDAL', 'PROJ',
-                                'FONTCONFIG', 'MAGICK_', '_INSAR_ARM_', 'CFLAGS', 'LDFLAGS'))}
+    env = isolated_env(home / 'runtime/cache')
     env.update(PATH='/usr/bin:/bin:/usr/sbin:/sbin', PYTHONNOUSERSITE='1',
                PYTHONDONTWRITEBYTECODE='1', CONDA_SUBDIR='osx-arm64',
                CONDARC=str(home / 'runtime/condarc'),

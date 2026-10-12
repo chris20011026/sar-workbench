@@ -13,6 +13,7 @@ import uuid
 from .core import (LOOKS, PAIR, atomic_json, declared_pairs, digest, inspect_data, parse_cmd3, find_conda,
                    safe_path, split_pre_review, validate_network, write_xml)
 from .inputs import prepare_raster
+from .environment import isolated_env
 
 RESOLVE_CONFIG_SCRIPT = "import sys, os, json\nsys.path.insert(0, os.path.join(os.environ['ISCE_STACK'], 'alosStack'))\nfrom StackPulic import loadStackUserParameters\nsys.argv = ['helper', 'alosStack.xml']\ns = loadStackUserParameters('alosStack.xml')\njson.dump(dict(estimate=bool(s.doIon), apply=bool(s.applyIon), subsequent=s.numberOfSubsequentDates, subsequent_ion=s.numberOfSubsequentDatesIon), open('helper_resolved.json', 'w'))\n"
 
@@ -117,13 +118,13 @@ class Engine:
         if self.cancel.is_set():
             raise RuntimeError('已停止，部分輸出可能不完整。')
         c = s['config']; root, proc, meta = self.paths(s)
-        env = os.environ.copy()
-        # Do not leak a host environment's Python/ISCE configuration.
-        for k in ('PYTHONPATH', 'PYTHONHOME', 'ISCE_HOME', 'ISCE_STACK'):
-            env.pop(k, None)
+        env = isolated_env(meta/'cache')
         if c.get('workflow')=='alos2App':
             env.update(OMP_NUM_THREADS='2',OPENBLAS_NUM_THREADS='2',MPLBACKEND='Agg',MPLCONFIGDIR=str(meta/'cache/matplotlib'))
         if conda:
+            selected_conda = find_conda(c['env'])
+            if not selected_conda:
+                raise ValueError('所選環境找不到 Conda，請重新選擇環境。')
             stack = str(Path(c['env']) / 'share/isce2/alosStack')
             # Pin the selected environment after activation, including when Conda
             # reactivates an already-active environment with another Python first.
@@ -135,7 +136,7 @@ class Engine:
             if c.get('workflow')=='alos2App' or managed.resolve() in Path(c['env']).resolve().parents:
                 plotting_path=''
             wrapper = ': "${ISCE_HOME:?ISCE_HOME is not set by the selected environment}"; export PATH="${3:+$3:}$2/bin:$1:$ISCE_HOME/bin:$ISCE_HOME/applications:$PATH"; shift 3; exec "$@"'
-            args = [c['conda'], 'run', '--no-capture-output', '-p', c['env'],
+            args = [selected_conda, 'run', '--no-capture-output', '-p', c['env'],
                     '/bin/bash', '-c', wrapper, 'alos-helper', stack, c['env'], plotting_path, *map(str, args)]
         self.log(s, '$ ' + shlex.join(list(map(str, args))))
         with (meta / 'run.log').open('a') as log:

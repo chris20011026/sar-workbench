@@ -44,6 +44,10 @@ jobs:
           env -i HOME="$HOME" USER="$USER" TMPDIR="$RUNNER_TEMP" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
             "$RUNNER_TEMP/release/SAR Workbench.app/Contents/MacOS/SARWorkbench" \
             --bootstrap-only --home "$RUNNER_TEMP/workbench"
+      - name: Reversible removal and coexistence guards
+        run: |
+          xcrun swiftc -swift-version 5 desktop/Bootstrap.swift desktop/Uninstall.swift tests/native/main.swift -framework CryptoKit -o "$RUNNER_TEMP/uninstall-tests"
+          "$RUNNER_TEMP/uninstall-tests"
       - name: Create and validate a fresh scientific environment
         run: |
           PYTHONDONTWRITEBYTECODE=1 \

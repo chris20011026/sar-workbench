@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.6.0-beta.1'
+VERSION = '0.6.0-beta.2'
 
 
 def build(output):
@@ -29,7 +29,7 @@ def build(output):
     info = dict(CFBundleName='SAR Workbench', CFBundleDisplayName='SAR 研究工作台',
                 CFBundleIdentifier='io.github.chris20011026.sar-workbench',
                 CFBundleExecutable='SARWorkbench', CFBundlePackageType='APPL',
-                CFBundleShortVersionString='0.6.0', CFBundleVersion='6001',
+                CFBundleShortVersionString='0.6.0', CFBundleVersion='6002',
                 LSMinimumSystemVersion='14.5', NSHighResolutionCapable=True,
                 CFBundleDevelopmentRegion='zh_TW',
                 NSHumanReadableCopyright='SAR Workbench contributors; third-party licenses apply.')
@@ -38,7 +38,7 @@ def build(output):
     env['CLANG_MODULE_CACHE_PATH'] = str(output / 'compiler-cache')
     subprocess.run(['xcrun', 'swiftc', '-swift-version', '5', '-O', '-target', 'arm64-apple-macos14.5',
                     '-module-cache-path', str(output / 'compiler-cache'),
-                    str(ROOT / 'desktop/Bootstrap.swift'), str(ROOT / 'desktop/main.swift'),
+                    str(ROOT / 'desktop/Bootstrap.swift'), str(ROOT / 'desktop/Uninstall.swift'), str(ROOT / 'desktop/main.swift'),
                     '-framework', 'AppKit', '-framework', 'CryptoKit', '-o', str(executable / 'SARWorkbench')],
                    env=env, check=True)
     # Ad-hoc signing enables local ARM execution; it is NOT Developer ID signing

@@ -22,6 +22,7 @@ from .onboarding import Onboarding, inspect_terrain
 from .runtime import ready_environment, workbench_home
 from .terrain import plan_terrain
 from .core import atomic_json
+from .preflight import check_project, require_preflight
 
 STATIC = Path(__file__).parent/'static'
 
@@ -148,7 +149,15 @@ def make_server(engine, port=8765):
                 if self.path == '/api/pair-template':return self.send(import_pair_xml(d['path']))
                 if self.path == '/api/template': return self.send({'properties':read_template(d['path'])})
                 if self.path == '/api/scan': return self.send({'dates':inspect_data(d['path'])})
-                if self.path == '/api/create': return self.send(engine.create(d))
+                if self.path == '/api/preflight': return self.send(check_project(d))
+                if self.path == '/api/project-check':
+                    s = engine.get(d['id'])
+                    return self.send(check_project(s['config'], existing=True))
+                if self.path == '/api/create':
+                    report = require_preflight(d)
+                    s = engine.create(d)
+                    atomic_json(engine.paths(s)[2]/'preflight.json', report)
+                    return self.send(s)
                 if self.path == '/api/analysis-create': return self.send(analyses.create(d['id'],d['kind'],d))
                 if self.path == '/api/analysis-invert': return self.send(analyses.invert(d['id'],d['run'],d))
                 if self.path == '/api/analysis-point': return self.send(analyses.point(d['id'],d['run'],d['y'],d['x']))
@@ -159,6 +168,10 @@ def make_server(engine, port=8765):
                 if self.path == '/api/geo-figure':return self.send(analyses.geo_figure(d['id'],d['run'],d))
                 if self.path == '/api/analysis-rename':return self.send(analyses.rename(d['id'],d['run'],d['name']))
                 if self.path == '/api/action':
+                    s = engine.get(d['id'])
+                    if d['action'] in ('prepare', 'run', 'continue', 'resume'):
+                        report = require_preflight(s['config'], existing=True)
+                        atomic_json(engine.paths(s)[2]/'preflight.json', report)
                     engine.launch(d['id'],d['action'],d.get('excluded'),d); return self.send({'ok':True})
                 if self.path == '/api/stop': engine.stop(); return self.send({'ok':True})
                 return self.send({'error':'Not found'},404)
@@ -180,6 +193,12 @@ def main():
     guard = (state_dir / 'server.lock').open('a')
     try: fcntl.flock(guard, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError: parser.exit(1, '這個工作台已經在執行；請開啟原本的瀏覽器頁面。\n')
+    usage = None
+    runtime = workbench_home()/'runtime'
+    if runtime.is_dir():
+        usage = (runtime/'usage.lock').open('a')
+        try: fcntl.flock(usage, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        except BlockingIOError: parser.exit(1, '運算工具正在解除安裝，請稍後重新開啟。\n')
     engine = Engine(args.state_dir)
     server=make_server(engine,args.port)
     url=f'http://127.0.0.1:{server.server_port}'
@@ -200,6 +219,7 @@ def main():
         server.onboarding.stop()
         if engine.active: engine.stop()
         server.server_close()
+        if usage: usage.close()
         guard.close()
 
 if __name__ == '__main__': main()

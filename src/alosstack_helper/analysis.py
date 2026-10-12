@@ -1,7 +1,8 @@
 """Independent, immutable analysis runs; research processing state stays untouched."""
 from pathlib import Path
 import json, os, re, signal, subprocess, threading, time, uuid, shutil, hashlib
-from .core import atomic_json, digest
+from .core import atomic_json, digest, find_conda
+from .environment import isolated_env
 from .workflows import inventory, options
 
 WORKER=Path(__file__).with_name('science_worker.py')
@@ -16,9 +17,7 @@ def fingerprint(files):
     return out
 
 def clean_env(cache):
-    env={k:v for k,v in os.environ.items() if not k.startswith(('PYTHON','ISCE','DYLD_','MPL','FONTCONFIG'))}
-    env.update(MPLBACKEND='Agg',MPLCONFIGDIR=str(cache/'matplotlib'),XDG_CACHE_HOME=str(cache),OMP_NUM_THREADS='2',OPENBLAS_NUM_THREADS='2')
-    return env
+    return isolated_env(cache)
 
 def failure_detail(log_path):
     """Keep the actionable scientific validation error visible next to the run."""
@@ -74,7 +73,8 @@ class Analyses:
             self.reserve();s=self.engine.get(key);inv=inventory(s)
             env=Path(data.get('environment') or s['config']['env']).expanduser().resolve()
             if not (env/'bin/python').is_file():raise ValueError('找不到分析環境的 Python。')
-            if not (env/'bin/conda').is_file() and not Path(s['config']['conda']).is_file():raise ValueError('找不到 Conda。')
+            conda = find_conda(env)
+            if not conda:raise ValueError('所選分析環境找不到 Conda。')
             opts=options(data,inv) if kind=='mintpy' else {}
             if opts.get('subset_lalo'):
                 resolved=self.geo_call(s,env,'roi',dict(inventory=inv,bounds=opts['subset_lalo']),self.base(key)/'.map-cache')
@@ -88,7 +88,7 @@ class Analyses:
                     raise ValueError('可用磁碟空間不足，請預留影像載入與時序結果所需空間。')
             run=uuid.uuid4().hex[:12];p=self.folder(key,run);p.mkdir(parents=True,exist_ok=False)
             try:
-                job=dict(id=run,kind=kind,project_id=key,status='running',stage='準備分析',created=time.strftime('%Y-%m-%d %H:%M:%S'),environment=str(env),conda=s['config']['conda'],inventory=inv,options=opts,source_fingerprint=fingerprint(inv['files']),history=[],error='',source_ion=s.get('ion',{}),source_ion_excluded=s.get('excluded',[]))
+                job=dict(id=run,kind=kind,project_id=key,status='running',stage='準備分析',created=time.strftime('%Y-%m-%d %H:%M:%S'),environment=str(env),conda=conda,inventory=inv,options=opts,source_fingerprint=fingerprint(inv['files']),history=[],error='',source_ion=s.get('ion',{}),source_ion_excluded=s.get('excluded',[]))
                 atomic_json(p/'analysis.json',job)
             except Exception:
                 # Only this newly created empty directory is ours.
@@ -116,7 +116,9 @@ class Analyses:
             threading.Thread(target=self.worker,args=(key,run,'invert'),daemon=True).start()
             return job
     def command(self,job,args):
-        return [job['conda'],'run','--no-capture-output','-p',job['environment'],'python',str(WORKER),*args]
+        conda = find_conda(job['environment'])
+        if not conda:raise ValueError('所選分析環境已移除，請重新安裝或選擇其他環境。')
+        return [conda,'run','--no-capture-output','-p',job['environment'],'python',str(WORKER),*args]
     def worker(self,key,run,mode):
         p=self.folder(key,run);job=self.get(key,run)
         try:
@@ -167,7 +169,9 @@ class Analyses:
         env=Path(env).expanduser().resolve()
         if not (env/'bin/python').is_file():raise ValueError('找不到所選分析環境。')
         cache.mkdir(parents=True,exist_ok=True)
-        command=[s['config']['conda'],'run','--no-capture-output','-p',str(env),'python',str(WORKER.with_name('geo_worker.py')),action,json.dumps(spec)]
+        conda=find_conda(env)
+        if not conda:raise ValueError('所選地圖分析環境找不到 Conda。')
+        command=[conda,'run','--no-capture-output','-p',str(env),'python',str(WORKER.with_name('geo_worker.py')),action,json.dumps(spec)]
         result=subprocess.run(command,env=clean_env(cache),capture_output=True,text=True,timeout=240)
         if result.returncode:
             lines=result.stderr.splitlines()+result.stdout.splitlines()

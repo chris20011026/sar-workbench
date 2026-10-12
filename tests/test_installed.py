@@ -12,6 +12,26 @@ from alosstack_helper.engine import Engine, RESOLVE_CONFIG_SCRIPT
 
 @unittest.skipUnless(os.environ.get('ALOSSTACK_TEST_ENV'), 'Set ALOSSTACK_TEST_ENV to test an installed ISCE2')
 class InstalledGeneratorTest(unittest.TestCase):
+    def test_conflicting_shell_settings_do_not_change_selected_tools_or_existing_config(self):
+        from alosstack_helper.core import digest
+        env=Path(os.environ['ALOSSTACK_TEST_ENV'])
+        protected=[p for p in [Path.home()/'.zshrc',Path.home()/'.bashrc',Path.home()/'.condarc',Path.home()/'.conda/environments.txt',*(env/'conda-meta').glob('*.json')] if p.is_file()]
+        before={str(p):digest(p) for p in protected}
+        with tempfile.TemporaryDirectory(prefix='alos-coexist-') as tmp:
+            root=Path(tmp);(root/'proc').mkdir();(root/'.helper').mkdir()
+            engine=Engine(root/'registry')
+            state={'config':{'root':str(root),'env':str(env),'conda':'/wrong/intel/conda'}}
+            poison={k:'/wrong/intel' for k in ('CONDA_PREFIX','CONDA_SUBDIR','CONDA_ENVS_PATH','PYTHONHOME','PYTHONPATH','ISCE_HOME','ISCE_STACK','GDAL_DATA','PROJ_LIB','DYLD_LIBRARY_PATH','BASH_ENV','ENV','CONDARC')}
+            poison.update(PATH='/wrong/intel/bin',MPLBACKEND='not_a_backend')
+            with patch.dict(os.environ,poison):
+                engine.run(state,['python','-c','import json,sys,isce,isceobj,numpy,matplotlib,os; json.dump(dict(prefix=sys.prefix,isce=isce.__file__,backend=matplotlib.get_backend(),proj=os.environ.get("PROJ_LIB")),open("coexist.json","w"))'],conda=True)
+                self.assertEqual(os.environ['CONDA_PREFIX'],'/wrong/intel')
+            result=json.loads((root/'proc/coexist.json').read_text())
+            self.assertEqual(Path(result['prefix']).resolve(),env.resolve())
+            self.assertIn(env.resolve(),Path(result['isce']).resolve().parents)
+            self.assertEqual(result['backend'].lower(),'agg')
+        self.assertEqual(before,{str(p):digest(p) for p in protected})
+
     def test_runner_finds_mdx_in_selected_isce_home(self):
         env=Path(os.environ['ALOSSTACK_TEST_ENV'])
         with tempfile.TemporaryDirectory(prefix='alos-runner-') as tmp:
