@@ -52,6 +52,17 @@ class ConfirmationControls(unittest.TestCase):
             r=review({'workflow':'alosStack'})
             self.assertFalse(r['can_proceed']);worker.assert_not_called()
 
+    def test_legacy_record_without_workflow_keeps_existing_pairs(self):
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            engine=Mock()
+            engine.get.return_value=dict(config={'reference':'200101'},dates=[{'date':'200101'},{'date':'200201'}],status='complete',expected_pairs=['200101-200201'])
+            engine.paths.return_value=(root,root,root)
+            result=saved_review(engine,'old')
+            self.assertTrue(result['legacy'])
+            self.assertEqual(result['network']['pairs'],['200101-200201'])
+
     def test_server_saves_report_and_rechecks_before_prepare(self):
         import re
         import threading

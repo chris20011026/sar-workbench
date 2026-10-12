@@ -26,3 +26,4 @@
 .confirmation-network details{max-height:280px;overflow:auto}.confirmation-network table{width:100%;border-collapse:collapse}.confirmation-network td,.confirmation-network th{padding:8px;text-align:left;border-bottom:1px solid #dee5dc}
 #preflightDialog dl,.confirmation-dialog dl{overflow-wrap:anywhere}#preflightDialog details,.confirmation-dialog details{margin:18px 0}
 @media(max-width:650px){.confirmation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#preflightDialog,.confirmation-dialog{padding:16px}}
+#preflightDialog [hidden],.confirmation-dialog [hidden]{display:none!important}

@@ -20,7 +20,7 @@
  window.renderConfirmation=(target,r,edit)=>{
   target.replaceChildren();
   const c=r.config||{},resolved=r.resolved||{};
-  if(c.workflow==='alosStack'){
+  if((c.workflow||'alosStack')==='alosStack'){
    target.append(node('p',r.status==='ready'?'以下為已產生指令中的配對，即將執行科學運算。':r.status?'以下為保存的處理紀錄。':'以下為所選 ISCE2 解析設定後的預覽。建立專案不會立即開始科學運算。','notice'));
    if(r.legacy)target.append(node('p','此專案建立於確認頁推出前，沒有當時的輸入快照；只能顯示既有設定與產生的配對。','hint'));
    const cards=node('div',undefined,'confirmation-grid');target.append(cards);
