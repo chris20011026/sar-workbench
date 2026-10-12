@@ -1,4 +1,10 @@
-# 0.6.0 beta 3 — ALOS-2 多日期恢復中心
+# 0.6.0 beta 4 — ALOS-2 影像資訊與覆蓋地圖
+
+新增[影像辨識與匯入地圖](IMAGE_IMPORT.md)：沿用 ISCE2 讀取 CEOS 正式中繼資料，交叉核對檔名、日期、frame、極化和圈次；混合觀測提供候選組。可查看日期／frame 概略覆蓋、共同區域及選用 OpenStreetMap 底圖。ZIP 整理後補讀邊界；全部邊界可用時可帶入地形範圍與緩衝，並在精靈核對 DEM／WBD 覆蓋。
+
+範圍是影像記錄的概略邊界，未做 DEM 地理定位，不代表相干性或有效形變成果。相對軌道與完整 ScanSAR 支援尚未完成。原始資料、既有處理成果與 Conda 環境保持不變。
+
+## 0.6.0 beta 3 — ALOS-2 多日期恢復中心
 
 新增[恢復中心](RECOVERY.md)：在主要階段前保存獨立的 proc 副本，失敗時顯示中斷位置、可能原因、保留內容與重跑起點。使用者確認後，完整核對副本雜湊、輸入紀錄、設定與套件紀錄，再保留半成品並還原重跑；不重複套用部分完成的電離層校正。人工判讀不跳過。
 
@@ -45,7 +51,7 @@ Beta 2 新增建立前的資料健檢摘要，以及既有專案的唯讀重新�
 需要 Apple Silicon Mac、Xcode Command Line Tools 與 Python 3.10+。一般使用者下載 App 不需要這些開發工具。
 
 ```sh
-python3 tools/build_macos_app.py --output dist/macos-beta3
+python3 tools/build_macos_app.py --output dist/macos-beta4
 ```
 
 產生 `.app`、ZIP 與 `SHA256SUMS`。使用新的輸出資料夾，不覆蓋舊版；只打包程式、文件、前端函式庫和套件清單，沒有本機科學環境、帳密或衛星影像。

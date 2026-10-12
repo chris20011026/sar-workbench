@@ -20,6 +20,7 @@ import zipfile
 from .core import atomic_json, inspect_data, safe_path
 from .runtime import RuntimeManager, ready_environment, private_env
 from .terrain import plan_terrain
+from .metadata import enrich
 
 PRODUCT = re.compile(r'^(?:LED|IMG-(?:HH|HV|VV|VH))-(ALOS2\d+)-(\d{6})-([A-Z0-9_.]+)$')
 MAX_ENTRIES = 50000
@@ -93,8 +94,17 @@ def scan_source(value):
                 file = Path(base) / name
                 if not name.startswith('.') and file.is_file():
                     visit(file)
+    return inventory_plan(str(path), entries, sorted(unsupported))
+
+
+def inventory_plan(source, entries, warnings=()):
+    warnings = list(warnings)
     names = set()
     for e in entries:
+        parts = PurePosixPath(e["member"]).parts[:-1] if e.get("member") else Path(e["source"]).parts[:-1]
+        folders = [part for part in parts if re.fullmatch(r"\d{6}", part)]
+        if folders and folders[-1] != e["date"]:
+            warnings.append(f"資料夾日期 {folders[-1]} 與產品日期 {e['date']} 不同，將以核對後的產品日期整理。")
         target = (e['date'], e['name'])
         if target in names:
             raise ValueError('有重複影像產品：' + e['name'] + '。請只保留一份來源後重新掃描；工作台不會猜測要用哪一版。')
@@ -118,8 +128,8 @@ def scan_source(value):
         problems.append('偵測到不同觀測模式或處理版本，請先分組。')
     if dates and any(d['frames'] != dates[0]['frames'] for d in dates):
         problems.append('各日期的 frame 範圍不同，請選擇相同 frame 組合。')
-    return dict(source=str(path), entries=entries, dates=dates, problems=problems,
-                warnings=sorted(unsupported), bytes=sum(e['size'] for e in entries),
+    return dict(source=str(source), entries=entries, dates=dates, problems=problems,
+                warnings=sorted(set(warnings)), bytes=sum(e['size'] for e in entries),
                 extract_bytes=sum(e['size'] for e in entries if e['member']),
                 file_count=len(entries), can_import=bool(entries) and not problems)
 
@@ -233,8 +243,22 @@ class Onboarding:
         self.home.mkdir(parents=True, exist_ok=True)
         atomic_json(self.jobs_file, list(self.jobs.values())[-10:])
 
-    def scan(self, path):
-        plan = scan_source(path)
+    def scan(self, path, environment=None):
+        plan = enrich(scan_source(path), environment)
+        return self._store_plan(plan)
+
+    def select(self, plan_id, keys):
+        original = self.plans.get(plan_id)
+        if not original or not isinstance(keys, list) or not keys:
+            raise ValueError("請先掃描並選取候選組。")
+        allowed = {p["key"] for p in original.get("metadata", {}).get("products", [])}
+        if not all(isinstance(k, str) and k in allowed for k in keys):
+            raise ValueError("選取的影像不在原始清單中。")
+        entries = [e for e in original["entries"] if "|".join([e["identity"],e["date"],e["mode"]]) in keys]
+        plan = inventory_plan(original["source"], entries)
+        return self._store_plan(enrich(plan, original.get("metadata_environment")))
+
+    def _store_plan(self, plan):
         key = uuid.uuid4().hex
         with self.lock:
             if len(self.plans) >= 20:
@@ -270,6 +294,13 @@ class Onboarding:
             if job['kind'] == 'import':
                 path = self.home / 'imports' / job['id']
                 result = organize(plan, path, lambda msg: job.update(stage=msg), self.cancelled.is_set)
+                if plan.get('metadata_environment'):
+                    job['stage'] = '補讀整理後影像的邊界與分組資訊'
+                    checked = enrich(scan_source(path), plan['metadata_environment'])
+                    result['inspection'] = {k:v for k,v in checked.items() if k != 'entries'}
+                    atomic_json(path / 'inspection.json', result['inspection'])
+                    if not checked['can_import']:
+                        raise ValueError('整理後的資料未通過檢查：'+'；'.join(checked['problems']))
             else:
                 terrain = job['kind'] == 'terrain'
                 base = self.home / ('terrain' if terrain else 'lessons'); base.mkdir(parents=True, exist_ok=True)

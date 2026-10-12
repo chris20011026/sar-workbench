@@ -7,3 +7,5 @@
 .health-row.error { background:#fff0e9; border-color:#e7b7a4; }
 .recovery-center p { overflow-wrap: anywhere; }
 .recovery-center pre { max-height: 300px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.import-map{height:440px;border:1px solid var(--line);border-radius:12px;background:#eaf0e6;z-index:0}.import-environment{overflow-wrap:anywhere}.import-groups{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0}.import-groups h3{flex-basis:100%}.onboard-table details{min-width:150px;max-width:330px}.onboard-table td{vertical-align:top}.onboard-table details p{overflow-wrap:anywhere;font-size:12px}.onboard-table summary{cursor:pointer}@media(max-width:720px){.import-map{height:340px}}

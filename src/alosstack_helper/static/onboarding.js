@@ -4,7 +4,7 @@
  const names={not_installed:'尚未安裝',running:'進行中',ready:'可以使用',failed:'需要處理',interrupted:'上次中斷',cancelled:'已停止'};
  function welcome(){current=null;reviewLoaded=null;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=false;$('crumb').textContent='開始使用';$('openWelcome').classList.add('active');$('newProject').classList.remove('active');clear();updateRuntime();window.scrollTo({top:0,behavior:'smooth'});}
  $('openWelcome').onclick=welcome;
- window.onboardingUpdate=data=>{if(first){first=false;if(!data.projects.length)welcome();}};
+ window.onboardingUpdate=data=>{const select=$('importEnvironment'),selected=select.value,signature=JSON.stringify(data.defaults?.environments||[]);if(select.dataset.environments!==signature){select.dataset.environments=signature;select.replaceChildren();const auto=node('option','自動選擇已安裝的環境');auto.value='';select.append(auto);for(const e of (data.defaults?.environments||[]).filter(e=>e.isce!==false)){const o=node('option',e.name+' · '+e.path);o.value=e.path;select.append(o);}if([...select.options].some(o=>o.value===selected))select.value=selected;}if(first){first=false;if(!data.projects.length)welcome();}};
  function showPanel(id){$(id).hidden=false;$(id).scrollIntoView({behavior:'smooth',block:'start'});}
  $('openLesson').onclick=()=>showPanel('lessonPanel');
  $('openImport').onclick=()=>showPanel('importPanel');
@@ -42,7 +42,7 @@
  updateRuntime();
 
  function lessonResult(r){lesson=r;$('lessonStatus').textContent=`完成：${r.dates.length} 個日期、${r.pair_count} 組配對，已核對合成答案。`;$('lessonResults').hidden=false;paintLesson();}
- function importResult(r){imported=r;$('importStatus').textContent='資料已整理。接著確認地形資料。';$('guidedTerrain').hidden=false;$('guidedTerrain').scrollIntoView({behavior:'smooth',block:'start'});}
+ function importResult(r){imported=r;dem=null;wbd=null;$('guidedDem').value='';$('guidedWbd').value='';$('applyGuided').disabled=true;$('organizeImport').hidden=true;if(r.inspection){plan=r.inspection;renderImportMetadata(plan);$('useImageBounds').hidden=!plan.metadata?.bounds;}else{plan=null;$('useImageBounds').hidden=true;}$('importStatus').textContent='資料已整理。接著確認地形資料。';$('guidedTerrain').hidden=false;$('guidedTerrain').scrollIntoView({behavior:'smooth',block:'start'});}
  async function terrainResult(r){await window.onboardingTerrainReady(r.dem,r.wbd);$('terrainStatus').textContent='地形已下載、轉換並通過描述檔檢查，已帶入上方欄位。';}
  function recentJobs(jobs){
   const signature=JSON.stringify(jobs);if(signature===jobsSignature)return;jobsSignature=signature;
@@ -101,30 +101,30 @@
  $('lessonRow').onchange=paintLesson;$('lessonCol').onchange=paintLesson;
  $('lessonMap').onclick=e=>{const b=e.currentTarget.getBoundingClientRect();$('lessonCol').value=Math.floor((e.clientX-b.left)/b.width*20);$('lessonRow').value=Math.floor((e.clientY-b.top)/b.height*16);paintLesson();};
 
- function resetPlan(){plan=null;imported=null;$('guidedTerrain').hidden=true;$('applyGuided').disabled=true;$('organizeImport').hidden=true;$('importInventory').replaceChildren();$('importStatus').textContent='來源已更新，請重新檢查。';}
+ function resetPlan(){terrainBounds=null;$('terrainStart').hidden=true;$('terrainPlanText').textContent='';window.clearImportMap?.();plan=null;imported=null;dem=null;wbd=null;$('useImageBounds').hidden=true;$('guidedDem').value='';$('guidedWbd').value='';$('guidedTerrain').hidden=true;$('applyGuided').disabled=true;$('organizeImport').hidden=true;$('importInventory').replaceChildren();$('importStatus').textContent='來源已更新，請重新檢查。';}
  $('importSource').oninput=resetPlan;
+ $('importEnvironment').onchange=resetPlan;
  action($('pickImportFolder'),()=>choosePath('dir',p=>{$('importSource').value=p;resetPlan();},$('importSource').value));
  action($('pickImportZip'),()=>choosePath('file',p=>{$('importSource').value=p;resetPlan();}));
  action($('scanImport'),async()=>{
-  const path=$('importSource').value;$('scanImport').disabled=true;$('importStatus').textContent='正在檢查檔案清單，不會更動原檔…';
+  const path=$('importSource').value,environment=$('importEnvironment').value;resetPlan();$('scanImport').disabled=true;$('importStatus').textContent='正在讀取檔案描述與影像邊界，不會更動原檔…';
   try{
-   const d=await api('/api/import-scan',{path});if($('importSource').value!==path)return;plan=d;
-   $('importInventory').replaceChildren();
-   const wrap=node('div',undefined,'onboard-table'),table=node('table'),head=node('tr');
-   for(const label of ['日期','Frames','極化','產品模式'])head.append(node('th',label));table.append(head);
-   for(const r of d.dates){const tr=node('tr');for(const v of [r.date,r.frames.join('、'),r.polarizations.join('、'),r.modes.join('、')])tr.append(node('td',v));table.append(tr);}wrap.append(table);$('importInventory').append(wrap);
-   for(const p of [...d.problems,...d.warnings])$('importInventory').append(node('p',p,'onboard-problem'));
-   $('importInventory').append(node('p','目前核對檔名、日期與檔案配套；精確軌道、影像幾何與涵蓋範圍會在 ISCE2 準備階段進一步確認。','hint'));
-   $('importStatus').textContent=`${d.dates.length} 個日期 · ${d.file_count} 個影像檔 · ${(d.bytes/1024**3).toFixed(2)} GB`;
-   $('organizeImport').hidden=!d.can_import;
+   const d=await api('/api/import-scan',{path,environment});if($('importSource').value!==path||$('importEnvironment').value!==environment)return;plan=d;
+   renderPlan(d);
   }finally{$('scanImport').disabled=false;}
  });
+ function renderPlan(d){
+  plan=d;renderImportMetadata(d,async keys=>{const selected=await api('/api/import-select',{plan:d.id,keys});if(plan!==d)return;renderPlan(selected);});
+  $('importStatus').textContent=`${d.dates.length} 個日期 · ${d.file_count} 個影像檔 · ${(d.bytes/1024**3).toFixed(2)} GB`;
+  $('organizeImport').hidden=!d.can_import;
+  $('useImageBounds').hidden=!d.metadata?.bounds;
+ }
  action($('organizeImport'),async()=>{
   if(!plan)throw Error('請先檢查資料。');$('organizeImport').disabled=true;
-  try{const job=await api('/api/import-start',{plan:plan.id});await watchJob(job,'importStatus',importResult);}
+  try{const selected=plan;const job=await api('/api/import-start',{plan:selected.id});await watchJob(job,'importStatus',r=>{if(plan===selected)importResult(r);});}
   finally{$('organizeImport').disabled=false;}
  });
- function ready(){const ok=!!(imported&&dem&&wbd);$('applyGuided').disabled=!ok;return ok;}
+ function ready(){const bounds=plan?.metadata?.bounds;const covers=t=>!bounds||t&&t.bounds[0]<=bounds[0]&&t.bounds[1]>=bounds[1]&&t.bounds[2]<=bounds[2]&&t.bounds[3]>=bounds[3];const coverageOK=covers(dem)&&covers(wbd);$('guidedReady').textContent=!coverageOK?'地形範圍未涵蓋全部影像，請重新選取或下載。':bounds?'地形需涵蓋全部影像邊界；下一頁仍會執行處理前檢查。':'影像完整範圍未確認，請自行確認 DEM／WBD 涵蓋影像後再建立專案。';const ok=!!(imported&&dem&&wbd&&coverageOK);$('applyGuided').disabled=!ok;return ok;}
  async function terrain(kind,path){
   const id=kind==='dem'?'guidedDem':'guidedWbd';$(id).value=path;$(id+'Info').textContent='正在核對地形描述…';
   if(kind==='dem')dem=null;else wbd=null;ready();
@@ -141,6 +141,12 @@
  // Terrain download helper can return validated local outputs here.
  window.onboardingTerrainReady=async(d,w)=>{await terrain('dem',d);await terrain('wbd',w);};
  const boundIds=['terrainSouth','terrainNorth','terrainWest','terrainEast'];
+ action($('useImageBounds'),()=>{
+  const bounds=plan?.metadata?.bounds;if(!bounds)throw Error('影像邊界尚未確認。');
+  const padded=[bounds[0]-.1,bounds[1]+.1,bounds[2]-.1,bounds[3]+.1];
+  boundIds.forEach((id,i)=>{$(id).value=padded[i].toFixed(5);});terrainBounds=null;$('terrainStart').hidden=true;
+  $('terrainPlanText').textContent='已帶入全部影像的概略外框，四邊各加 0.1° 緩衝；請核對範圍並預覽下載。不是 MintPy 裁切範圍。';
+ });
  for(const id of boundIds)$(id).oninput=()=>{terrainBounds=null;$('terrainStart').hidden=true;$('terrainPlanText').textContent='範圍已修改，請重新預覽。';};
  action($('terrainPlan'),async()=>{
   if(boundIds.some(id=>!$(id).value.trim()))throw Error('請輸入完整的四個經緯度。');

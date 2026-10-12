@@ -9,7 +9,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.6.0-beta.3'
+VERSION = '0.6.0-beta.4'
 
 
 def build(output):
@@ -29,7 +29,7 @@ def build(output):
     info = dict(CFBundleName='SAR Workbench', CFBundleDisplayName='SAR 研究工作台',
                 CFBundleIdentifier='io.github.chris20011026.sar-workbench',
                 CFBundleExecutable='SARWorkbench', CFBundlePackageType='APPL',
-                CFBundleShortVersionString='0.6.0', CFBundleVersion='6003',
+                CFBundleShortVersionString='0.6.0', CFBundleVersion='6004',
                 LSMinimumSystemVersion='14.5', NSHighResolutionCapable=True,
                 CFBundleDevelopmentRegion='zh_TW',
                 NSHumanReadableCopyright='SAR Workbench contributors; third-party licenses apply.')

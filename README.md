@@ -1,5 +1,8 @@
 # SAR 研究工作台（SAR Workbench）
 
+新增：ALOS-2 正式中繼資料核對、候選分組、影像覆蓋地圖與地形範圍帶入。使用方式與限制見[影像匯入說明](docs/IMAGE_IMPORT.md)。
+
+
 本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.6.0 beta 3**。新增 ALOS-2 多日期恢復中心：保存階段前副本、診斷中斷、確認後驗證並復原續跑。
 
 | 工作流 | 狀態 |
@@ -10,7 +13,7 @@
 | Sentinel-1 topsApp / topsStack | 規劃中 |
 | Stripmap stripmapApp / stripmapStack | 規劃中 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.3) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.4) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
 [第一次使用指南](docs/FIRST_USE.md) · [0.6 更新與驗證方式](docs/RELEASE_0.6.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 

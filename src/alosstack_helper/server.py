@@ -37,7 +37,7 @@ def defaults():
     env = next((p for p in candidates if (p/'share/isce2/alosStack/create_cmds.py').is_file()), None)
     return {'home':str(Path.home()), 'env':str(env) if env else '',
             'template':str(env/'share/isce2/alosStack/alosStack.xml') if env else '',
-            'environments':[{'path':str(p),'name':p.name,'mintpy':bool(list((p/'conda-meta').glob('mintpy-*.json'))) or any((p/'lib').glob('python*/site-packages/mintpy'))} for p in candidates if (p/'bin/python').is_file()]}
+            'environments':[{'path':str(p),'name':p.name,'isce':(p/'share/isce2/alosStack/create_cmds.py').is_file(),'mintpy':bool(list((p/'conda-meta').glob('mintpy-*.json'))) or any((p/'lib').glob('python*/site-packages/mintpy'))} for p in candidates if (p/'bin/python').is_file()]}
 
 def make_server(engine, port=8765):
     token = secrets.token_urlsafe(32)
@@ -63,7 +63,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -136,7 +136,8 @@ def make_server(engine, port=8765):
                         raise ValueError('請先完成目前的資料準備或教學工作。')
                     return self.send(onboarding.runtime.start(consent=d.get('consent') is True, recheck=d.get('recheck') is True))
                 if self.path == '/api/setup-stop': onboarding.runtime.stop(); return self.send({'ok':True})
-                if self.path == '/api/import-scan': return self.send(onboarding.scan(d['path']))
+                if self.path == '/api/import-scan': return self.send(onboarding.scan(d['path'], d.get('environment') or defaults()['env']))
+                if self.path == '/api/import-select': return self.send(onboarding.select(d['plan'], d['keys']))
                 if self.path == '/api/import-start': return self.send(onboarding.start_job('import', d.get('plan')))
                 if self.path == '/api/onboarding-stop': onboarding.stop(); return self.send({'ok':True})
                 if self.path == '/api/demo-start':
