@@ -1,11 +1,11 @@
 # 第一次使用 SAR 工作台
 
-這份指南適用於 **0.6.0 beta 2 / Apple Silicon Mac，macOS 14.5 以上**。
+這份指南適用於 **0.6.0 beta 3 / Apple Silicon Mac，macOS 14.5 以上**。
 不需要先安裝 Python、Conda、ISCE2 或使用終端機；首次安裝仍需要網路與下載時間。
 
 ## 1. 下載並開啟
 
-1. 到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.2)，選擇 `SAR-Workbench-0.6.0-beta.2-macOS-arm64.zip`，不要選 Source code。
+1. 到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.3)，選擇 `SAR-Workbench-0.6.0-beta.3-macOS-arm64.zip`，不要選 Source code。
 2. 解壓縮，把 `SAR Workbench.app` 放到你想保留的位置（例如「應用程式」），雙擊開啟。
 3. 此測試版尚未完成 Apple Developer ID 簽署及公證。第一次可能需要依 macOS「隱私權與安全性」的提示確認開啟；請核對下載來源。不要關閉整台電腦的 Gatekeeper。
 4. 按「準備並開啟工作台」。啟動器下載官方 Miniforge 並核對 SHA256，再開啟瀏覽器。之後開啟 App 再按此按鈕，不需要 ChatGPT 或 Codex；啟動前也可選解除安裝。
@@ -63,6 +63,8 @@
 可填資料提供者的**完整影像外框**核對地形覆蓋；未填時顯示尚未確認。檔名和首筆紀錄無法保證精確同軌、所有資料紀錄完整或科學品質。空間估計是輸入量乘 4 的中間檔規劃值，再加複製需求與 1 GB 緩衝；並非實際磁碟需求預測。已有專案可展開「資料健檢與失敗處理」重新檢查，不啟動運算。
 
 ## 與既有 ISCE 共存及解除安裝
+
+ALOS-2 多日期運算中斷可使用[恢復中心](RECOVERY.md)：新專案預設保存階段前副本，舊專案可在運算前啟用。保護會增加儲存及磁碟讀取需求；有副本才可核對後恢復，沒有副本時只提供診斷。詳細成本、保留範圍與限制請見連結。
 
 每次子程序都清除繼承的 Python、Conda、ISCE、GDAL、PROJ、動態函式庫與 shell 注入設定，再使用所選環境的 Conda。MintPy 與地圖亦依分析環境選擇 Conda，不沿用舊專案的安裝器。既有套件、`.zshrc`、`.bashrc`、`.condarc` 不需修改。自行在终端機運算時，請避免與工作台同時寫入同一個專案。
 

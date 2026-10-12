@@ -14,6 +14,7 @@ from .core import (LOOKS, PAIR, atomic_json, declared_pairs, digest, inspect_dat
                    safe_path, split_pre_review, validate_network, write_xml)
 from .inputs import prepare_raster
 from .environment import isolated_env
+from .recovery import Recovery, PHASES, process_alive
 
 RESOLVE_CONFIG_SCRIPT = "import sys, os, json\nsys.path.insert(0, os.path.join(os.environ['ISCE_STACK'], 'alosStack'))\nfrom StackPulic import loadStackUserParameters\nsys.argv = ['helper', 'alosStack.xml']\ns = loadStackUserParameters('alosStack.xml')\njson.dump(dict(estimate=bool(s.doIon), apply=bool(s.applyIon), subsequent=s.numberOfSubsequentDates, subsequent_ion=s.numberOfSubsequentDatesIon), open('helper_resolved.json', 'w'))\n"
 
@@ -24,6 +25,8 @@ class Engine:
         self.projects = json.loads(self.registry.read_text()) if self.registry.exists() else {}
         self.lock = threading.Lock(); self.process = None; self.active = None
         self.cancel = threading.Event()
+        self.resume_phase = None
+        self.worker_action = None
         for key in self.projects:
             s = self.get(key)
             if s['status'] == 'running':
@@ -102,7 +105,7 @@ class Engine:
         (root / 'proc').mkdir(); (root / '.helper').mkdir()
         write_xml(c, root / 'proc/alosStack.xml')
         key = uuid.uuid4().hex[:12]
-        state = dict(id=key, config=c, dates=dates, status='new', stage='等待準備', history=[], excluded=[])
+        state = dict(id=key, config=c, dates=dates, status='new', stage='等待準備', history=[], excluded=[], recovery_enabled=True)
         self.save(state); self.projects[key] = str(root); atomic_json(self.registry, self.projects)
         return state
 
@@ -143,9 +146,18 @@ class Engine:
             p = subprocess.Popen(args, cwd=cwd or proc, stdout=log, stderr=subprocess.STDOUT,
                                  env=env, start_new_session=True)
             self.process = p
+            try: atomic_json(meta/'worker-process.json', {'pgid':p.pid})
+            except Exception:
+                try: os.killpg(p.pid,signal.SIGKILL)
+                except ProcessLookupError: pass
+                p.wait(); self.process=None
+                raise
             if self.cancel.is_set():
                 os.killpg(p.pid, signal.SIGTERM)
             code = p.wait(); self.process = None
+        if process_alive(meta):
+            raise RuntimeError('主程序已結束，但仍有子程序存在；請先停止殘留運算，不能開始下一階段。')
+        (meta/'worker-process.json').unlink(missing_ok=True)
         if code or self.cancel.is_set():
             raise RuntimeError(f'指令停止（結束碼 {code}），請查看日誌。未自動重試。')
 
@@ -158,11 +170,23 @@ class Engine:
             if self.active:
                 raise ValueError('已有工作執行中，請等待或停止。')
             s = self.get(key)
+            if process_alive(self.paths(s)[2]):
+                raise ValueError('仍有先前工作留下的運算程序，請先確認已停止。')
             if s['config'].get('workflow')=='alos2App':
                 from .pair import PairWorkflow
                 PairWorkflow(self).validate_action(s,action,options or {})
                 self.active=key;self.cancel.clear();s.update(status='running',error='');self.save(s)
                 threading.Thread(target=self.worker,args=(s,action),daemon=True).start()
+                return
+            if action == 'recover':
+                report = Recovery(self,s).report()
+                if not report['can_recover']: raise ValueError(report.get('blocked','不能復原。'))
+                if not options or options.get('confirmed') is not True or options.get('snapshot') != report['snapshot']['id']:
+                    raise ValueError('請先檢視最新診斷並確認復原範圍。')
+                self.active=key; self.cancel.clear()
+                s.update(status='running',stage='正在驗證復原副本（大量檔案可能需要較久）')
+                self.save(s)
+                threading.Thread(target=self.recover_worker,args=(s,options['snapshot']),daemon=True).start()
                 return
             expected = {'prepare': 'new', 'run': 'ready', 'continue': 'review'}
             retry_prepare = action == 'prepare' and self.can_retry_prepare(s)
@@ -176,10 +200,42 @@ class Engine:
             threading.Thread(target=self.worker, args=(s, action), daemon=True).start()
 
     def checkpoint(self, s, label, operation):
+        if self.resume_phase:
+            if label != self.resume_phase: return
+            self.resume_phase = None
+        if s.get('recovery_enabled') and label in PHASES:
+            s['stage']='保存階段前副本 · '+label; self.save(s)
+            self.log(s, '正在保存並核對復原副本：'+label)
+            try: Recovery(self,s).capture(label,self.worker_action)
+            except Exception:
+                # Nothing scientific has run if the very first baseline failed.
+                if label=='cmd1 · 對位與幾何' and not s.get('recovery'):
+                    s['retry_first_snapshot']=True
+                raise
+            s.pop('retry_first_snapshot',None)
         s['stage'] = label; self.save(s); self.log(s, '\n=== ' + label + ' ===')
         operation()
         s['history'].append({'stage': label, 'time': time.strftime('%Y-%m-%d %H:%M:%S')})
         self.save(s)
+
+    def recovery_enable(self, key, enabled):
+        with self.lock:
+            s=self.get(key)
+            if self.active or process_alive(self.paths(s)[2]): raise ValueError('運算中不能變更復原保護。')
+            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review'):
+                raise ValueError('只能在多日期運算開始前或人工判讀時變更後續保護。')
+            s['recovery_enabled']=bool(enabled); self.save(s)
+
+    def recover_worker(self,s,snapshot):
+        try:
+            action, phase = Recovery(self,s).restore(snapshot)
+            self.resume_phase=phase
+        except Exception as e:
+            s.update(status='failed',error=str(e),stage='復原已停止；現有資料已保留')
+            self.log(s,'RECOVERY ERROR: '+str(e));self.save(s)
+            with self.lock: self.active=None
+            return
+        self.worker(s,action)
 
     def verify_commands(self, s):
         _, proc, _ = self.paths(s)
@@ -196,10 +252,12 @@ class Engine:
             products = list((proc/'pairs'/pair).rglob('*.unw.geo'))
             if not products or any(not p.stat().st_size for p in products):
                 raise ValueError('缺少非空的地理編碼解纏結果：'+pair)
+        if s.get('recovery_enabled'): Recovery(self,s).check_rasters(proc)
         s.update(status='complete', stage='運算結束，請進行科學品質檢查')
         atomic_json(meta/'report.json', s)
 
     def worker(self, s, action):
+        self.worker_action=action
         try:
             root, proc, meta = self.paths(s); c = s['config']
             if c.get('workflow')=='alos2App':
@@ -308,9 +366,13 @@ class Engine:
                     self.log(s, '套用電離層校正已關閉：保留估計結果，不執行 ion_correct。')
                 self.finish(s, review['science_pairs'])
         except Exception as e:
-            s.update(status='failed', error=str(e), stage='已停止，需要檢查', failed_action=action)
+            s.update(failed_phase=s.get('stage'),status='failed', error=str(e), stage='已停止，需要檢查', failed_action=action)
+            if s.pop('retry_first_snapshot',False):
+                s.update(status='ready',stage='尚未開始 cmd1；請處理副本問題後重試，或關閉復原保護')
             self.log(s, 'ERROR: '+str(e))
         finally:
+            self.resume_phase=None
+            self.worker_action=None
             self.save(s)
             with self.lock: self.active = None
 

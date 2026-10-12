@@ -5,3 +5,5 @@
 .health-row p { overflow-wrap:anywhere; margin-bottom:0; }
 .health-row.warning { background:#fff8e7; border-color:#e9d6a2; }
 .health-row.error { background:#fff0e9; border-color:#e7b7a4; }
+.recovery-center p { overflow-wrap: anywhere; }
+.recovery-center pre { max-height: 300px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; }

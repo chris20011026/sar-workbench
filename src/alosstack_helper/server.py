@@ -23,6 +23,7 @@ from .runtime import ready_environment, workbench_home
 from .terrain import plan_terrain
 from .core import atomic_json
 from .preflight import check_project, require_preflight
+from .recovery import Recovery
 
 STATIC = Path(__file__).parent/'static'
 
@@ -62,7 +63,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -86,6 +87,7 @@ def make_server(engine, port=8765):
                     return self.send({'path':str(p),'parent':str(p.parent),'entries':entries})
                 key = q.get('id',[''])[0]; s = engine.get(key)
                 root, proc, meta = engine.paths(s)
+                if u.path == '/api/recovery': return self.send(Recovery(engine,s).report())
                 if u.path == '/api/pair-artifact':
                     p=PairWorkflow(engine).artifact(s,q['file'][0])
                     return self.send(p.read_bytes(),mime=mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
@@ -153,6 +155,9 @@ def make_server(engine, port=8765):
                 if self.path == '/api/project-check':
                     s = engine.get(d['id'])
                     return self.send(check_project(s['config'], existing=True))
+                if self.path == '/api/recovery-enable':
+                    if type(d.get('enabled')) is not bool: raise ValueError('請選擇是否啟用保護。')
+                    engine.recovery_enable(d['id'],d['enabled']); return self.send({'ok':True})
                 if self.path == '/api/create':
                     report = require_preflight(d)
                     s = engine.create(d)
@@ -169,7 +174,7 @@ def make_server(engine, port=8765):
                 if self.path == '/api/analysis-rename':return self.send(analyses.rename(d['id'],d['run'],d['name']))
                 if self.path == '/api/action':
                     s = engine.get(d['id'])
-                    if d['action'] in ('prepare', 'run', 'continue', 'resume'):
+                    if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover'):
                         report = require_preflight(s['config'], existing=True)
                         atomic_json(engine.paths(s)[2]/'preflight.json', report)
                     engine.launch(d['id'],d['action'],d.get('excluded'),d); return self.send({'ok':True})

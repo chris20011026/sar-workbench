@@ -1,6 +1,6 @@
 # SAR 研究工作台（SAR Workbench）
 
-本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.6.0 beta 2**。新增運算前健檢、既有環境隔離與可復原的解除安裝。
+本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.6.0 beta 3**。新增 ALOS-2 多日期恢復中心：保存階段前副本、診斷中斷、確認後驗證並復原續跑。
 
 | 工作流 | 狀態 |
 | --- | --- |
@@ -10,7 +10,7 @@
 | Sentinel-1 topsApp / topsStack | 規劃中 |
 | Stripmap stripmapApp / stripmapStack | 規劃中 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.2) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.3) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
 [第一次使用指南](docs/FIRST_USE.md) · [0.6 更新與驗證方式](docs/RELEASE_0.6.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
@@ -59,7 +59,7 @@ macOS 上的「選擇」與「匯入 XML 範本」預設開啟系統原生選擇
 - 匯入 XML 後可用表單修改 property。輸出位置由工具固定在專案內；電離層估計與校正各有「使用程式預設值／啟用／關閉」三個選項。未設定的參數不寫入 XML，準備階段由目前安裝的 ISCE2 解析實際預設值並顯示摘要。關閉估計時執行 cmd1、cmd2、cmd4；僅關閉校正時保留電離層估計、判讀與 ion_ls，跳過 ion_correct。兩個旗標組合與上游一致：估計關閉時，即使校正旗標啟用也不套用校正。
 - 保留原始 cmd1～4。從明確的 upstream 段落拆出 cmd3 前段；不認識的結構會停止。後段使用解析的 `ion_ls.py` 參數，指定 `-exc_pair`，並逐對呼叫 `ion_correct.py`。
 - 排除清單會檢查配對網路連通性及待校正日期涵蓋。沒有自動壞日期排除，避開目前安裝版本 `-exc_date` 的說明/實作差異。
-- 運算錯誤即停止並保留產物，不自動重試。若僅準備步驟失敗且未建立任何科學運算產物，畫面可手動重新檢查並準備指令。恢復失敗中的階段、改變排除清單後重新執行，尚未提供 UI；需先診斷。不要用新建專案覆蓋半成品。
+- 運算錯誤即停止並保留產物，不自動重試。準備失敗且未進入科學運算可手動重新準備；ALOS-2 多日期新增[恢復中心](docs/RECOVERY.md)，有有效的階段前副本才可確認還原並重跑該階段。改變設定或排除清單後不能直接使用原副本。不要用新建專案覆蓋半成品。
 - 完成檢查涵蓋程序退出碼、電離層必要產物及地理編碼解纏檔存在且非空；不代表科學品質合格或完整的數值驗證。
 
 ## 資料位置
