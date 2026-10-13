@@ -11,7 +11,7 @@ WORKFLOWS = [
     dict(id='alosStack', name='ALOS-2 · 多日期', tool='alosStack', available=True, description='資料準備 → 電離層判讀 → 解纏 → MintPy'),
     dict(id='alos2App', name='ALOS-2 · 雙日期', tool='alos2App.py', available=True, description='試用：Level 1.1 Stripmap · 兩期干涉與電離層檢查'),
     dict(id='topsStack', name='Sentinel-1 TOPS · 多日期', tool='topsStack', available=False, description='規劃中：TOPS stack 與時序分析'),
-    dict(id='topsApp', name='Sentinel-1 TOPS · 雙日期', tool='topsApp.py', available=False, description='規劃中：TOPS 雙日期干涉'),
+    dict(id='topsApp', name='Sentinel-1 TOPS · 雙日期', tool='topsApp.py', available=True, experimental=True, description='試驗：S1A／S1B IW SLC · 尚未完成真實影像驗證'),
     dict(id='stripmapStack', name='Stripmap · 多日期', tool='stripmapStack', available=False, description='規劃中：支援感測器的 stripmap stack'),
     dict(id='stripmapApp', name='Stripmap · 雙日期', tool='stripmapApp.py', available=False, description='規劃中：支援感測器的 stripmap 雙日期'),
 ]

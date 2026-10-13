@@ -41,7 +41,7 @@
  };
  const card=node('div',undefined,'card'),heading=node('div',undefined,'card-heading'),open=node('button','查看處理確認紀錄');heading.append(node('h2','這次處理會做什麼？'),open);card.append(heading,node('p','查看影像範圍、配對網路、設定與準備階段的核對結果。','hint'));$('project').insertBefore(card,$('project').querySelector('.project-settings'));
  let project=null;
- window.confirmationProject=s=>{project=s;card.hidden=s.config.workflow==='alos2App';open.disabled=s.status==='running';};
+ window.confirmationProject=s=>{project=s;card.hidden=['alos2App','topsApp'].includes(s.config.workflow);open.disabled=s.status==='running';};
  const dialog=node('dialog',undefined,'confirmation-dialog'),body=node('div'),footer=node('div',undefined,'inline'),close=node('button','返回'),start=node('button','確認並開始運算','primary'),ack=node('label',undefined,'check'),checkbox=node('input');checkbox.type='checkbox';ack.append(checkbox,document.createTextNode('我已核對配對與設定，準備開始運算。'));footer.append(close,start);dialog.append(node('h2','處理確認'),body,ack,footer);document.body.append(dialog);close.onclick=()=>dialog.close();let pending=null;checkbox.onchange=()=>start.disabled=!checkbox.checked;
  async function show(id,run){pending=null;start.hidden=!run;ack.hidden=!run;checkbox.checked=false;start.disabled=true;body.replaceChildren(node('p','正在讀取保存的確認紀錄…'));dialog.showModal();try{const r=await api('/api/confirmation-saved',{id});if(!dialog.open)return;window.renderConfirmation(body,r);if(run&&r.status!=='ready')throw Error('專案狀態已改變，請返回重新整理。');pending=id;}catch(e){body.replaceChildren(node('p',e.message,'error'));throw e;}}
  action(open,()=>show(project.id,false));

@@ -5,7 +5,7 @@
 
 ## 1. 下載並開啟
 
-1. 到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.5)，選擇 `SAR-Workbench-0.6.0-beta.5-macOS-arm64.zip`，不要選 Source code。
+1. 到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.6)，選擇 `SAR-Workbench-0.6.0-beta.6-macOS-arm64.zip`，不要選 Source code。
 2. 解壓縮，把 `SAR Workbench.app` 放到你想保留的位置（例如「應用程式」），雙擊開啟。
 3. 此測試版尚未完成 Apple Developer ID 簽署及公證。第一次可能需要依 macOS「隱私權與安全性」的提示確認開啟；請核對下載來源。不要關閉整台電腦的 Gatekeeper。
 4. 按「準備並開啟工作台」。啟動器下載官方 Miniforge 並核對 SHA256，再開啟瀏覽器。之後開啟 App 再按此按鈕，不需要 ChatGPT 或 Codex；啟動前也可選解除安裝。

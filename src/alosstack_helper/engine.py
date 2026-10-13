@@ -46,6 +46,9 @@ class Engine:
         return results
 
     def can_retry_prepare(self, s):
+        if s['config'].get('workflow')=='topsApp':
+            from .tops import TopsWorkflow
+            return TopsWorkflow(self).can_retry(s)
         if s['config'].get('workflow')=='alos2App':
             from .pair import PairWorkflow
             return PairWorkflow(self).can_retry(s)
@@ -59,6 +62,9 @@ class Engine:
                        ('dates', 'dates_resampled', 'pairs', 'pairs_ion', 'dates_ion', 'baseline', 'fig_ion'))
 
     def create(self, c):
+        if c.get('workflow')=='topsApp':
+            from .tops import TopsWorkflow
+            return TopsWorkflow(self).create(c)
         if c.get('workflow')=='alos2App':
             from .pair import PairWorkflow
             return PairWorkflow(self).create(c)
@@ -122,7 +128,7 @@ class Engine:
             raise RuntimeError('已停止，部分輸出可能不完整。')
         c = s['config']; root, proc, meta = self.paths(s)
         env = isolated_env(meta/'cache')
-        if c.get('workflow')=='alos2App':
+        if c.get('workflow') in ('alos2App','topsApp'):
             env.update(OMP_NUM_THREADS='2',OPENBLAS_NUM_THREADS='2',MPLBACKEND='Agg',MPLCONFIGDIR=str(meta/'cache/matplotlib'))
         if conda:
             selected_conda = find_conda(c['env'])
@@ -136,7 +142,7 @@ class Engine:
             managed = Path(os.environ.get('SAR_WORKBENCH_HOME', str(Path.home()/'sar-workbench')))/'runtime/envs'
             # The managed distribution supplies its own native rendering tools.
             # A legacy checkout's optional compatibility shim must not override them.
-            if c.get('workflow')=='alos2App' or managed.resolve() in Path(c['env']).resolve().parents:
+            if c.get('workflow') in ('alos2App','topsApp') or managed.resolve() in Path(c['env']).resolve().parents:
                 plotting_path=''
             wrapper = ': "${ISCE_HOME:?ISCE_HOME is not set by the selected environment}"; export PATH="${3:+$3:}$2/bin:$1:$ISCE_HOME/bin:$ISCE_HOME/applications:$PATH"; shift 3; exec "$@"'
             args = [selected_conda, 'run', '--no-capture-output', '-p', c['env'],
@@ -172,6 +178,12 @@ class Engine:
             s = self.get(key)
             if process_alive(self.paths(s)[2]):
                 raise ValueError('仍有先前工作留下的運算程序，請先確認已停止。')
+            if s['config'].get('workflow')=='topsApp':
+                from .tops import TopsWorkflow
+                TopsWorkflow(self).validate_action(s,action,options or {})
+                self.active=key;self.cancel.clear();s.update(status='running',error='');self.save(s)
+                threading.Thread(target=self.worker,args=(s,action),daemon=True).start()
+                return
             if s['config'].get('workflow')=='alos2App':
                 from .pair import PairWorkflow
                 PairWorkflow(self).validate_action(s,action,options or {})
@@ -260,6 +272,10 @@ class Engine:
         self.worker_action=action
         try:
             root, proc, meta = self.paths(s); c = s['config']
+            if c.get('workflow')=='topsApp':
+                from .tops import TopsWorkflow
+                TopsWorkflow(self).worker(s,action)
+                return
             if c.get('workflow')=='alos2App':
                 from .pair import PairWorkflow
                 PairWorkflow(self).worker(s,action)

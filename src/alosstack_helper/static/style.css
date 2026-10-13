@@ -27,3 +27,6 @@
 #preflightDialog dl,.confirmation-dialog dl{overflow-wrap:anywhere}#preflightDialog details,.confirmation-dialog details{margin:18px 0}
 @media(max-width:650px){.confirmation-grid{grid-template-columns:repeat(2,minmax(0,1fr))}#preflightDialog,.confirmation-dialog{padding:16px}}
 #preflightDialog [hidden],.confirmation-dialog [hidden]{display:none!important}
+
+#topsForm [hidden],#topsForm[hidden],#topsWorkbench[hidden]{display:none!important}
+#topsForm .geo-map,#topsWorkbench .geo-map{height:420px;min-height:260px}#topsForm .path-row{display:flex;flex-wrap:wrap;gap:6px}#topsForm .path-row input{min-width:120px;flex:1}#topsForm .path-row button{font-size:12px;padding:8px}

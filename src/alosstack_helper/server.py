@@ -16,6 +16,8 @@ from .engine import Engine
 from .native_picker import choose_native
 from .analysis import Analyses
 from .pair import PairWorkflow, FIELDS, import_pair_xml
+from .tops import TopsWorkflow, FIELDS as TOPS_FIELDS, preflight as tops_preflight
+from .sentinel import inspect_pair as inspect_sentinel_pair
 from .workflows import WORKFLOWS, inventory
 from .mintpy_parameters import catalogue
 from .onboarding import Onboarding, inspect_terrain
@@ -65,7 +67,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -78,6 +80,7 @@ def make_server(engine, port=8765):
                 if u.path == '/api/onboarding': return self.send(dict(onboarding.runtime.status(), jobs=onboarding.recent()))
                 if u.path == '/api/onboarding-job': return self.send(onboarding.job(q.get('job', [''])[0]))
                 if u.path == '/api/state': return self.send({'projects':engine.list(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active)})
+                if u.path == '/api/tops-schema':return self.send({'fields':TOPS_FIELDS})
                 if u.path == '/api/pair-schema':return self.send({'fields':FIELDS})
                 if u.path == '/api/mintpy-schema':return self.send(catalogue(q.get('environment',[None])[0] or None))
                 if u.path == '/api/browse':
@@ -95,8 +98,8 @@ def make_server(engine, port=8765):
                     return self.send(p.read_bytes(),mime=mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
                 if u.path == '/api/analyses': return self.send({'runs':analyses.listing(key)})
                 if u.path == '/api/analysis': return self.send(analyses.details(key,q['run'][0]))
-                if u.path == '/api/analysis-artifact':
-                    p=analyses.artifact(key,q['run'][0],q['file'][0])
+                if u.path in ('/api/analysis-artifact','/api/tops-artifact'):
+                    p=TopsWorkflow(engine).artifact(s,q['file'][0]) if u.path=='/api/tops-artifact' else analyses.artifact(key,q['run'][0],q['file'][0])
                     self.send_response(200)
                     self.send_header('Content-Type',mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
                     self.send_header('Content-Length',str(p.stat().st_size))
@@ -154,16 +157,19 @@ def make_server(engine, port=8765):
                 if self.path == '/api/pair-template':return self.send(import_pair_xml(d['path']))
                 if self.path == '/api/template': return self.send({'properties':read_template(d['path'])})
                 if self.path == '/api/scan': return self.send({'dates':inspect_data(d['path'])})
+                if self.path == '/api/tops-scan':return self.send(inspect_sentinel_pair(d['reference_safe'],d['secondary_safe']))
+                if self.path == '/api/tops-preflight':return self.send(tops_preflight(d))
                 if self.path == '/api/preflight': return self.send(check_project(d))
                 if self.path == '/api/confirmation': return self.send(confirmations.preview(d))
                 if self.path == '/api/confirmation-saved': return self.send(saved_review(engine,d['id']))
                 if self.path == '/api/project-check':
                     s = engine.get(d['id'])
-                    return self.send(check_project(s['config'], existing=True))
+                    return self.send(tops_preflight(s['config'],existing=True) if s['config'].get('workflow')=='topsApp' else check_project(s['config'], existing=True))
                 if self.path == '/api/recovery-enable':
                     if type(d.get('enabled')) is not bool: raise ValueError('請選擇是否啟用保護。')
                     engine.recovery_enable(d['id'],d['enabled']); return self.send({'ok':True})
                 if self.path == '/api/create':
+                    if d.get('workflow')=='topsApp':return self.send(engine.create(d))
                     confirmation = confirmations.validate(d) if d.get('confirmation_id') else None
                     report = require_preflight(d)
                     s = engine.create(d)
@@ -181,6 +187,9 @@ def make_server(engine, port=8765):
                 if self.path == '/api/analysis-rename':return self.send(analyses.rename(d['id'],d['run'],d['name']))
                 if self.path == '/api/action':
                     s = engine.get(d['id'])
+                    if s['config'].get('workflow')=='topsApp':
+                        TopsWorkflow(engine).verify(s)
+                        engine.launch(d['id'],d['action'],options=d);return self.send({'ok':True})
                     if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover'):
                         report = require_preflight(s['config'], existing=True)
                         atomic_json(engine.paths(s)[2]/'preflight.json', report)
