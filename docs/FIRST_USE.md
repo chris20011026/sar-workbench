@@ -1,11 +1,11 @@
 # 第一次使用 SAR 工作台
 
-這份指南適用於 **0.6.0 beta 3 / Apple Silicon Mac，macOS 14.5 以上**。
+這份指南適用於 **0.7.0 beta 1 / Apple Silicon Mac，macOS 14.5 以上**。
 不需要先安裝 Python、Conda、ISCE2 或使用終端機；首次安裝仍需要網路與下載時間。
 
 ## 1. 下載並開啟
 
-1. 到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.6)，選擇 `SAR-Workbench-0.6.0-beta.6-macOS-arm64.zip`，不要選 Source code。
+1. 到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.7.0-beta.1)，選擇 `SAR-Workbench-0.7.0-beta.1-macOS-arm64.zip`，不要選 Source code。
 2. 解壓縮，把 `SAR Workbench.app` 放到你想保留的位置（例如「應用程式」），雙擊開啟。
 3. 此測試版尚未完成 Apple Developer ID 簽署及公證。第一次可能需要依 macOS「隱私權與安全性」的提示確認開啟；請核對下載來源。不要關閉整台電腦的 Gatekeeper。
 4. 按「準備並開啟工作台」。啟動器下載官方 Miniforge 並核對 SHA256，再開啟瀏覽器。之後開啟 App 再按此按鈕，不需要 ChatGPT 或 Codex；啟動前也可選解除安裝。
@@ -35,7 +35,7 @@
 5. 選既有 WGS84 橢球高 DEM 與 ISCE WBD，或展開「我還沒有 DEM／水體遮罩」取得公開地形資料。
 6. 「帶入設定，確認專案」後，檢查參考日期、極化與處理設定，再建立專案。運算途中仍保留電離層與 MintPy 參考點等人工檢查點。
 
-精靈目前支援 ALOS-2 Level 1.1。雙日期限同模式 Stripmap；Sentinel-1、通用 Stripmap 工作流尚未開放。檔名清單檢查不等於已驗證軌道、幾何或科學品質；後續 ISCE2 準備還會檢查。衛星資料的帳號、取得與授權仍由使用者處理。
+這個匯入精靈支援 ALOS-2 Level 1.1，雙日期限同模式 Stripmap。Sentinel-1 IW SLC 雙日期另有試驗入口；TOPS 多日期與通用 Stripmap 尚未開放。檔名清單檢查不等於已驗證軌道、幾何或科學品質；後續 ISCE2 準備還會檢查。衛星資料的帳號、取得與授權仍由使用者處理。
 
 ## 地形資料的選擇
 
@@ -76,3 +76,7 @@ ALOS-2 多日期運算中斷可使用[恢復中心](RECOVERY.md)：新專案預�
 解除安裝會拒絕仍有工作台／安裝锁定、runtime 符號連結、缺少安裝紀錄、非預期頂層檔案，或索引中有專案位於 runtime 的情況。不要自行在 runtime 裡存研究資料。自行從終端機使用專用環境的程序仍須手動停止。取消視窗不移動工具。
 
 若誤移除，可在垃圾桶將 runtime 放回原位置（不要覆蓋後來的新安裝），或重新安裝。重新安裝可能產生不同環境路徑；旧專案的設定不自動修改，新分析可選新環境。
+
+## 查看專案占用空間
+
+在專案總覽按「管理專案 → 儲存空間 → 開始統計」。影像放在其他資料夾或 NAS 時，可勾選一起統計外部來源。統計可以停止；關閉管理視窗不會中止統計。結果保存在本機，外接磁碟離線時仍可查看上次紀錄。詳見[空間統計說明](STORAGE_USAGE.md)。

@@ -5,11 +5,13 @@ import hashlib
 import os
 from pathlib import Path
 import plistlib
+import runpy
 import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = '0.6.0-beta.6'
+VERSIONS = runpy.run_path(ROOT / 'src/alosstack_helper/__init__.py')
+VERSION = VERSIONS['DISPLAY_VERSION']
 
 
 def build(output):
@@ -29,7 +31,7 @@ def build(output):
     info = dict(CFBundleName='SAR Workbench', CFBundleDisplayName='SAR 研究工作台',
                 CFBundleIdentifier='io.github.chris20011026.sar-workbench',
                 CFBundleExecutable='SARWorkbench', CFBundlePackageType='APPL',
-                CFBundleShortVersionString='0.6.0', CFBundleVersion='6006',
+                CFBundleShortVersionString=VERSION.split('-')[0], CFBundleVersion=VERSIONS['MAC_BUNDLE_VERSION'],
                 LSMinimumSystemVersion='14.5', NSHighResolutionCapable=True,
                 CFBundleDevelopmentRegion='zh_TW',
                 NSHumanReadableCopyright='SAR Workbench contributors; third-party licenses apply.')

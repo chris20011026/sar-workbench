@@ -33,6 +33,8 @@ from .recovery import Recovery
 from .confirmation import Confirmations, saved_review, verify_saved_inputs
 from .workspace import overview, workflow_catalogue, identify
 from .environment_checks import EnvironmentChecks
+from .storage_usage import StorageUsage
+from . import DISPLAY_VERSION
 
 STATIC = Path(__file__).parent/'static'
 
@@ -58,6 +60,7 @@ def make_server(engine, port=8765):
     onboarding = Onboarding()
     environment_checks = EnvironmentChecks(engine.home)
     confirmations = Confirmations()
+    storage_usage = StorageUsage(engine)
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
         def send(self, value, status=200, mime='application/json'):
@@ -78,7 +81,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -86,12 +89,15 @@ def make_server(engine, port=8765):
                     if name == 'index.html':
                         data = data.replace(b'__ONBOARDING__', (STATIC/'onboarding-panel.html').read_bytes())
                         data = data.replace(b'__TOKEN__', token.encode())
+                        data = data.replace(b'__VERSION__', DISPLAY_VERSION.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
                 if u.path == '/api/workspace':
                     return self.send(dict(overview(engine,analyses,nisar_jobs,conversion_jobs,onboarding), workflows=workflow_catalogue()))
                 if u.path == '/api/project-details':
                     return self.send(engine.project_details(q['id'][0]))
+                if u.path == '/api/storage-usage':
+                    return self.send(storage_usage.get(q['id'][0]))
                 if u.path == '/api/environment-status':
                     return self.send(dict(environments=environment_checks.catalogue(defaults()['environments'], ready_environment()), managed=onboarding.runtime.status()))
                 if u.path == '/api/nisar': return self.send(nisar_jobs.get(q['job'][0]) if 'job' in q else dict(jobs=nisar_jobs.listing(), fields=NISAR_FIELDS, version=NISAR_VERSION, busy=bool(nisar_jobs.active)))
@@ -157,7 +163,7 @@ def make_server(engine, port=8765):
             launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert',
                         '/api/demo-start', '/api/terrain-start', '/api/import-start',
                         '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
-                        '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach')
+                        '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach', '/api/storage-usage-start')
             if self.path in launches:
                 with operation_lock: self.handle_post()
             else: self.handle_post()  # Native picker and previews must never block Stop.
@@ -167,16 +173,24 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/storage-usage-start':
+                    return self.send(storage_usage.start(d['id'], d.get('include_external', False)))
+                if self.path == '/api/storage-usage-stop':
+                    storage_usage.stop(d['id']); return self.send(storage_usage.get(d['id']))
                 if self.path == '/api/storage-refresh':
                     engine.storage.mounts(force=True); return self.send({'ok':True})
                 if self.path == '/api/project-preview':
                     return self.send(engine.preview_project(d['path'], d.get('id')))
                 if self.path == '/api/project-attach':
-                    return self.send(engine.attach_project(d['path'], d['id']))
+                    result = engine.attach_project(d['path'], d['id'])
+                    if storage_usage.active == d['id']: storage_usage.stop(d['id'])
+                    return self.send(result)
                 if self.path == '/api/project-edit':
                     return self.send(engine.edit_project(d['id'], d['name'], d.get('notes', '')))
                 if self.path == '/api/project-remove':
-                    return self.send(engine.unregister(d['id']))
+                    result = engine.unregister(d['id'])
+                    if storage_usage.active == d['id']: storage_usage.stop(d['id'])
+                    return self.send(result)
                 if self.path == '/api/project-restore':
                     return self.send(engine.restore_registration(d['token']))
                 if self.path == '/api/workspace-identify':
@@ -268,10 +282,15 @@ def make_server(engine, port=8765):
                 if self.path == '/api/stop': engine.stop(); return self.send({'ok':True})
                 return self.send({'error':'Not found'},404)
             except Exception as e: self.send({'error':str(e)},400)
-    server = ThreadingHTTPServer(('127.0.0.1',port),Handler)
+    class Server(ThreadingHTTPServer):
+        def server_close(self):
+            storage_usage.stop(shutdown=True)
+            super().server_close()
+    server = Server(('127.0.0.1',port),Handler)
     server.onboarding = onboarding
     server.nisar_jobs = nisar_jobs
     server.conversion_jobs = conversion_jobs
+    server.storage_usage = storage_usage
     return server
 
 def main():
@@ -301,6 +320,7 @@ def main():
         atomic_json(args.desktop_session, {'url':url, 'pid':os.getpid()})
     if not args.no_browser: webbrowser.open(url)
     def shutdown(*_):
+        server.storage_usage.stop(shutdown=True)
         server.nisar_jobs.stop(shutdown=True)
         server.conversion_jobs.stop(shutdown=True)
         server.onboarding.runtime.stop()

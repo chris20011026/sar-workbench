@@ -265,5 +265,26 @@ class MissionAPI(unittest.TestCase):
             self.assertIn('舊路徑',json.loads(e.exception.read())['error'])
         self.assertIsNone(self.engine.active)
 
+    def test_storage_inventory_api_is_authenticated_and_does_not_start_processing(self):
+        import time, urllib.error
+        from alosstack_helper.core import atomic_json
+        root=self.base/'inventory-project';(root/'proc').mkdir(parents=True)
+        atomic_json(root/'.helper/state.json',dict(id='usage',status='complete',history=[],config=dict(root=str(root),name='Usage')))
+        self.engine.register('usage',root)
+        for path,data in [('/api/storage-usage?id=usage',None),('/api/storage-usage-start',dict(id='usage')),('/api/storage-usage-stop',dict(id='usage'))]:
+            for headers in ({'X-Token':''},{'Origin':'https://example.org'}):
+                with self.assertRaises(urllib.error.HTTPError) as error:self.request(path,data,headers=headers)
+                self.assertEqual(error.exception.code,403)
+        self.assertIsNone(self.request('/api/storage-usage?id=usage')['report'])
+        self.request('/api/storage-usage-start',dict(id='usage',include_external=False))
+        for _ in range(100):
+            result=self.request('/api/storage-usage?id=usage')
+            if not result['busy']:break
+            time.sleep(.02)
+        self.assertEqual(result['report']['status'],'complete')
+        self.assertIsNone(self.engine.active)
+        root.rename(self.base/'unplugged')
+        self.assertEqual(self.request('/api/storage-usage?id=usage')['report'],result['report'])
+
 
 if __name__=='__main__':unittest.main()

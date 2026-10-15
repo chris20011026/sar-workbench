@@ -1,13 +1,15 @@
 # SAR 研究工作台（SAR Workbench）
 
-**main 分支新增：[統一工作空間](docs/WORKSPACE.md)與 [NISAR／ALOS-4 實驗流程](docs/MISSION_LAB.md)**。提供 NISAR 雙日期的表單、健檢與執行入口，以及 ALOS-4 格式副本和跨衛星相容性檢查。真實 NISAR 全流程與混合 ALOS 自動接續尚待驗證；既有 Mac 下載包尚未包含這些新增功能。
+**0.7 測試版新增：[統一工作空間](docs/WORKSPACE.md)與 [NISAR／ALOS-4 實驗流程](docs/MISSION_LAB.md)**。提供 NISAR 雙日期的表單、健檢與執行入口，以及 ALOS-4 格式副本和跨衛星相容性檢查。真實 NISAR 全流程與混合 ALOS 自動接續尚待驗證；新版 Mac 下載包已納入這些入口；ISCE3 仍需另外準備獨立環境。
 
 新增：ALOS-2 正式中繼資料核對、候選分組、影像覆蓋地圖與地形範圍帶入。使用方式與限制見[影像匯入說明](docs/IMAGE_IMPORT.md)。
 
-main 另提供[外接磁碟與專案管理](docs/WORKSPACE.md#外接硬碟與專案管理)：更名、備註、加入既有工作台專案、離線紀錄保留與磁碟重連。掛載位置改變時核對磁碟及專案代號後引導重新連結；舊科學指令內的絕對路徑仍保留保護，不自動改寫續跑。
+本版另提供[外接磁碟與專案管理](docs/WORKSPACE.md#外接硬碟與專案管理)：更名、備註、加入既有工作台專案、離線紀錄保留與磁碟重連。掛載位置改變時核對磁碟及專案代號後引導重新連結；舊科學指令內的絕對路徑仍保留保護，不自動改寫續跑。
 
 
-本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.6.0 beta 6**。新增 [Sentinel-1 TOPS 雙日期試驗流程](docs/SENTINEL_TOPS.md)：SAFE／ZIP 辨識、選区、精密軌道、共同 burst 檢查與階段執行。尚未完成真實 SLC 端到端驗證。
+「管理專案 → 儲存空間」可背景統計各類資料占用與磁碟可用空間，支援停止和離線查看上次結果；[計算方式與限制](docs/STORAGE_USAGE.md)。
+
+本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.7.0 beta 1**。新增 [Sentinel-1 TOPS 雙日期試驗流程](docs/SENTINEL_TOPS.md)：SAFE／ZIP 辨識、選区、精密軌道、共同 burst 檢查與階段執行。尚未完成真實 SLC 端到端驗證。
 
 | 工作流 | 狀態 |
 | --- | --- |
@@ -17,12 +19,12 @@ main 另提供[外接磁碟與專案管理](docs/WORKSPACE.md#外接硬碟與專
 | Sentinel-1 雙日期 topsApp | 試驗；S1A／S1B IW SLC，未完成真實影像驗證 |
 | Sentinel-1 多日期 topsStack | 規劃中 |
 | Stripmap stripmapApp / stripmapStack | 規劃中 |
-| NISAR 雙日期（ISCE3） | main 實驗功能；獨立環境，未完成真實 RSLC 全流程驗證 |
-| ALOS-4 格式轉換／混合資料健檢 | main 實驗功能；不自動接續跨衛星干涉 |
+| NISAR 雙日期（ISCE3） | 實驗功能；獨立環境，未完成真實 RSLC 全流程驗證 |
+| ALOS-4 格式轉換／混合資料健檢 | 實驗功能；不自動接續跨衛星干涉 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.6) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.7.0-beta.1) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
-[第一次使用指南](docs/FIRST_USE.md) · [0.6 更新與驗證方式](docs/RELEASE_0.6.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
+[第一次使用指南](docs/FIRST_USE.md) · [0.7 更新與驗證方式](docs/RELEASE_0.7.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
 「工具與環境」提供合成教學、ALOS-2 ZIP／資料夾匯入與公開地形下載。真實 SAR 影像仍需自行取得，科學參考點與電離層品質仍需判讀。自動安裝使用 [insar-arm](https://github.com/chris20011026/insar-arm) 的固定套件，放在工作台專用資料夾；既有 Conda 環境與研究專案保持原設定。
 
