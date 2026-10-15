@@ -26,7 +26,7 @@
   $('migrationSetup').hidden=!!r;$('migrationRecord').hidden=!r;if(!r)return;
   $('migrationSource').textContent=r.source;$('migrationDestination').textContent=r.destination;$('migrationStatus').textContent=titles[phase]||phase;
   if(changed||r.error)$('migrationError').textContent=r.error||'';
-  const step=phase==='planning'?0:phase==='preview'?1:phase==='copying'?1:phase==='verifying'?2:3;
+  const step=['failed','paused'].includes(phase)?({plan:0,copy:1,switch:3}[r.mode]??0):phase==='planning'?0:phase==='preview'?1:phase==='copying'?1:phase==='verifying'?2:3;
   for(const [i,item] of [...dialog.querySelectorAll('.migration-steps li')].entries()){if(i===step)item.setAttribute('aria-current','step');else item.removeAttribute('aria-current');}
   $('migrationSpaceWarning').hidden=phase!=='preview';$('migrationSpaceWarning').textContent=`估計需要 ${size(r.required)}（含 64 MB 餘裕）。`+(r.space_ok===false?'預覽時空間不足；請先釋出空間，開始複製時會再次檢查。':'複製前會再次檢查磁碟空間。');
   const stats=$('migrationStats');stats.replaceChildren();

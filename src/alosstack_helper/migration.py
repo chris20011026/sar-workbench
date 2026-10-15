@@ -356,7 +356,10 @@ class Transfer:
                 self.publish(True,status='switch_ready',current='')
             else: raise ValueError('未知的搬移操作。')
         except Exception as error:
-            self.publish(True, status='failed', current='', error=str(error), finished=time.time())
+            message=str(error)
+            if isinstance(error,FileNotFoundError):message='找不到來源或目的地。請接回磁碟，或更換目的位置。\n'+str(error.filename or '')
+            elif isinstance(error,PermissionError):message='無法讀取或寫入所選位置，請檢查磁碟權限。\n'+str(error.filename or '')
+            self.publish(True, status='failed', current='', error=message, finished=time.time())
         finally: self.db.close()
         return self.s
 

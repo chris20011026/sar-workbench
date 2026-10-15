@@ -92,6 +92,11 @@ class TransferTests(unittest.TestCase):
         self.m.start(self.key,s['transfer'],'copy',True);s=self.wait()
         self.assertEqual(s['status'],'failed');self.assertIn('原檔案已變更',s['error']);self.assertFalse(Path(s['destination']).exists())
 
+    def test_missing_destination_has_recovery_guidance_and_creates_nothing(self):
+        missing=self.base/'offline'
+        self.m.plan(self.key,str(missing),'copy');s=self.wait()
+        self.assertEqual(s['status'],'failed');self.assertIn('接回磁碟',s['error']);self.assertFalse(missing.exists())
+
     def test_missing_source_or_added_file_is_not_silently_skipped(self):
         for change in ('add','remove'):
             with self.subTest(change=change):
