@@ -40,14 +40,33 @@ class InstalledGeneratorTest(unittest.TestCase):
             state={'config':{'root':str(root),'env':str(env),'conda':str(find_conda(env))}}
             engine.run(state,['python','-c','import json,os,shutil; json.dump(dict(mdx=shutil.which("mdx"),isce_home=os.environ["ISCE_HOME"],python=shutil.which("python")),open("tools.json","w"))'],conda=True)
             result=json.loads((root/'proc/tools.json').read_text())
-            plotting=Path(__file__).resolve().parents[1]/'.runtime/bin/mdx'
-            managed=Path(os.environ.get('SAR_WORKBENCH_HOME',str(Path.home()/'sar-workbench')))/'runtime/envs'
-            private=managed.resolve() in env.resolve().parents
             expected=(env/'bin/mdx') if (env/'bin/mdx').is_file() else Path(result['isce_home'])/'bin/mdx'
-            if plotting.is_file() and not private: expected=plotting
             self.assertEqual(result['mdx'],str(expected))
-            if private: self.assertIn(env.resolve(),Path(result['mdx']).resolve().parents)
+            self.assertIn(env.resolve(),Path(result['mdx']).resolve().parents)
             self.assertEqual(result['python'],str(env/'bin/python'))
+
+    def test_rendering_ignores_legacy_launchers_and_uses_selected_environment(self):
+        from alosstack_helper import plot_check
+        env=Path(os.environ['ALOSSTACK_TEST_ENV'])
+        with tempfile.TemporaryDirectory(prefix='alos-native-plot-') as tmp:
+            root=Path(tmp);(root/'proc').mkdir();(root/'.helper').mkdir()
+            legacy=root/'checkout/.runtime/bin';legacy.mkdir(parents=True)
+            for name in ('mdx','montage','convert'):
+                tool=legacy/name
+                tool.write_text('#!/bin/sh\necho LEGACY_TOOL_MUST_NOT_RUN >&2\nexit 91\n')
+                tool.chmod(0o755)
+            engine=Engine(root/'registry')
+            state={'config':{'root':str(root),'env':str(env),'workflow':'alosStack'}}
+            fake_module=str(root/'checkout/src/alosstack_helper/engine.py')
+            with patch('alosstack_helper.engine.__file__',fake_module):
+                engine.run(state,['python','-c','import json,shutil; json.dump({n:shutil.which(n) for n in ("python","mdx","montage","convert")},open("tools.json","w"))'],conda=True)
+                paths=json.loads((root/'proc/tools.json').read_text())
+                for name,path in paths.items():
+                    self.assertTrue(path,name)
+                    self.assertIn(env.resolve(),Path(path).resolve().parents,name)
+                engine.run(state,['python',plot_check.__file__],conda=True)
+            self.assertIn('繪圖檢查通過',(root/'.helper/run.log').read_text())
+
     def test_shebang_uses_selected_python_when_environment_already_active(self):
         env=Path(os.environ['ALOSSTACK_TEST_ENV'])
         conda=find_conda(env)

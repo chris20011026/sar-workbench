@@ -150,16 +150,11 @@ class Engine:
             stack = str(Path(c['env']) / 'share/isce2/alosStack')
             # Pin the selected environment after activation, including when Conda
             # reactivates an already-active environment with another Python first.
-            plotting_bin = Path(__file__).resolve().parents[2]/'.runtime/bin'
-            plotting_path = str(plotting_bin) if all((plotting_bin/x).is_file() for x in ('mdx','montage','convert')) else ''
-            managed = Path(os.environ.get('SAR_WORKBENCH_HOME', str(Path.home()/'sar-workbench')))/'runtime/envs'
-            # The managed distribution supplies its own native rendering tools.
-            # A legacy checkout's optional compatibility shim must not override them.
-            if c.get('workflow') in ('alos2App','topsApp') or managed.resolve() in Path(c['env']).resolve().parents:
-                plotting_path=''
-            wrapper = ': "${ISCE_HOME:?ISCE_HOME is not set by the selected environment}"; export PATH="${3:+$3:}$2/bin:$1:$ISCE_HOME/bin:$ISCE_HOME/applications:$PATH"; shift 3; exec "$@"'
+            # Rendering belongs to the selected science environment too. A local
+            # legacy .runtime/bin must never override its native tools.
+            wrapper = ': "${ISCE_HOME:?ISCE_HOME is not set by the selected environment}"; export PATH="$2/bin:$1:$ISCE_HOME/bin:$ISCE_HOME/applications:$PATH"; shift 2; exec "$@"'
             args = [selected_conda, 'run', '--no-capture-output', '-p', c['env'],
-                    '/bin/bash', '-c', wrapper, 'alos-helper', stack, c['env'], plotting_path, *map(str, args)]
+                    '/bin/bash', '-c', wrapper, 'alos-helper', stack, c['env'], *map(str, args)]
         self.log(s, '$ ' + shlex.join(list(map(str, args))))
         with (meta / 'run.log').open('a') as log:
             p = subprocess.Popen(args, cwd=cwd or proc, stdout=log, stderr=subprocess.STDOUT,
