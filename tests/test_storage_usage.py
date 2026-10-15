@@ -194,5 +194,19 @@ class UsageTests(unittest.TestCase):
             with self.assertRaises(ValueError):self.manager.get(key)
         with self.assertRaises(ValueError):self.manager.start(self.key,'false')
 
+    def test_failed_rescan_keeps_last_complete_inventory(self):
+        self.engine()
+        previous=self.scan();atomic_json(self.manager.path(self.key),previous)
+        self.root.rename(self.base/'away')
+        self.manager.start(self.key)
+        for _ in range(150):
+            result=self.manager.get(self.key)
+            if not result['busy']:break
+            time.sleep(.02)
+        self.assertEqual(result['report']['status'],'failed')
+        self.assertEqual(result['previous'],previous)
+        self.manager.start(self.key);self.manager.stop(self.key)
+        self.assertEqual(self.manager.get(self.key)['previous'],previous)
+
 
 if __name__=='__main__':unittest.main()

@@ -271,7 +271,9 @@ class StorageUsage:
         with self.lock:
             self.path(key); self.reconcile()
             record = self._record(key)
-            return dict(report=record, busy=self.active,
+            previous_path = self.folder / (key + '.last.json')
+            previous = json.loads(previous_path.read_text()) if previous_path.exists() else None
+            return dict(report=record, previous=previous, busy=self.active,
                         location_changed=bool(record and absolute(record['root']) != absolute(self.engine.projects[key])))
 
     def start(self, key, include_external=False):
@@ -284,6 +286,9 @@ class StorageUsage:
                            binding=entry.get('root_binding'), inputs=entry.get('inputs', {}))
             request_path = self.folder / (key + '.request.json')
             atomic_json(request_path, request)
+            previous = self._record(key)
+            if previous and previous.get('status') == 'complete':
+                atomic_json(self.folder / (key + '.last.json'), previous)
             atomic_json(output, Inventory(request, lambda _: None).report)
             reader, writer = os.pipe()
             try:
@@ -318,6 +323,8 @@ class StorageUsage:
                 except subprocess.TimeoutExpired: pass
             record = self._record(self.active)
             record.update(status='interrupted' if shutdown else 'cancelled', finished=time.time(), current='')
+            if process.poll() is None:
+                record['reason'] = '已要求停止；作業系統仍在處理磁碟讀取，結束後才可重新統計。'
             atomic_json(self.folder / (self.active + '.json'), record)
             self.reconcile()
 

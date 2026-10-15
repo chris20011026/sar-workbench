@@ -18,6 +18,7 @@
  const previews={relink:null,existing:null},versions={relink:0,existing:0};
  function localAction(id,error,fn){action($(id),async()=>{$(error).textContent='';try{await fn();}catch(e){$(error).textContent=e.message;}});}
  function drawConnection(d){
+  window.updateUsageConnection?.(d);
   const box=$('managerConnection');box.replaceChildren(node('span',labels[d.status]||d.status,'ws-status '+(d.status==='online'?'complete':'unavailable')));
   box.append(node('p',d.volume?'儲存裝置：'+d.volume.label:'儲存於本機或指定資料夾'),node('p',d.root,'ws-path'));
   if(d.reason)box.append(node('p',d.reason,'notice'));
@@ -33,7 +34,7 @@
  window.openProjectManager=async id=>{
   generation++;key=id;details=null;$('managerError').textContent='';$('managerSaved').textContent='';$('managerConnection').textContent='正在檢查連線…';$('managerCandidates').replaceChildren();$('managerPaths').replaceChildren();$('managerRelink').open=false;$('relinkPath').value='';invalidate('relink');
   const version=generation,d=await api('/api/project-details?id='+encodeURIComponent(id));if(version!==generation)return;
-  details=d;$('managerName').value=d.name;$('managerNotes').value=d.notes||'';drawConnection(d);dialog.showModal();window.openStorageUsage?.(id);
+  details=d;$('managerName').value=d.name;$('managerNotes').value=d.notes||'';drawConnection(d);dialog.showModal();window.openStorageUsage?.(id,d);
  };
  window.openExistingProject=()=>{$('existingError').textContent='';$('existingPath').value='';invalidate('existing');importer.showModal();};
  $('closeProjectManager').onclick=()=>dialog.close();$('closeExistingProject').onclick=()=>importer.close();
