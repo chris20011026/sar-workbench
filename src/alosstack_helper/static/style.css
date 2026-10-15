@@ -30,3 +30,16 @@
 
 #topsForm [hidden],#topsForm[hidden],#topsWorkbench[hidden]{display:none!important}
 #topsForm .geo-map,#topsWorkbench .geo-map{height:420px;min-height:260px}#topsForm .path-row{display:flex;flex-wrap:wrap;gap:6px}#topsForm .path-row input{min-width:120px;flex:1}#topsForm .path-row button{font-size:12px;padding:8px}
+
+/* Read-only product library */
+.library-path{overflow-wrap:anywhere;word-break:break-word;text-align:left}
+.library-product{padding:22px 0;border-top:1px solid var(--line,#dce4dc)}
+.library-product h3{margin-bottom:8px}
+.library-product .badge{white-space:normal;line-height:1.7}
+.library-scale{height:16px;border-radius:8px;margin-top:18px}
+#libMap{height:520px;background:#e9eee8}
+#libReport pre{max-height:280px;overflow:auto;white-space:pre-wrap}
+#libRecent button{max-width:100%;white-space:normal}
+#libraryPanel .input-row{flex-wrap:wrap}
+#libraryPanel .input-row input{min-width:180px;flex:1}
+@media(max-width:700px){#libMap{height:360px}#libraryPanel .inline{flex-wrap:wrap}}

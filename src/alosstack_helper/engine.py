@@ -28,7 +28,8 @@ class Engine:
         self.resume_phase = None
         self.worker_action = None
         for key in self.projects:
-            s = self.get(key)
+            try: s = self.get(key)
+            except (OSError, ValueError): continue
             if s['status'] == 'running':
                 s.update(status='failed', error='服務已中斷；請先檢查殘留運算與產物，不會自動重跑。')
                 self.save(s)
@@ -40,10 +41,22 @@ class Engine:
         atomic_json(Path(state['config']['root']) / '.helper/state.json', state)
 
     def list(self):
-        results = [self.get(k) for k in self.projects]
+        results = []
+        for k in self.projects:
+            try: results.append(self.get(k))
+            except (OSError, ValueError): continue
         for s in results:
             s['can_retry_prepare'] = self.can_retry_prepare(s)
         return results
+
+    def unavailable(self):
+        """Keep missing/offline project registrations visible and untouched."""
+        missing=[]
+        for key, root in self.projects.items():
+            try: self.get(key)
+            except (OSError, ValueError):
+                missing.append(dict(id=key,root=str(root),reason='專案狀態無法讀取；請確認磁碟連線或資料夾是否已移動。'))
+        return missing
 
     def can_retry_prepare(self, s):
         if s['config'].get('workflow')=='topsApp':

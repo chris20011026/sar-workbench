@@ -11,6 +11,7 @@ import signal
 import threading
 import fcntl
 
+from .library import Library
 from .core import inspect_data, read_template
 from .engine import Engine
 from .native_picker import choose_native
@@ -45,6 +46,7 @@ def defaults():
 def make_server(engine, port=8765):
     token = secrets.token_urlsafe(32)
     analyses = Analyses(engine)
+    library = Library(engine.home)
     onboarding = Onboarding()
     confirmations = Confirmations()
     class Handler(BaseHTTPRequestHandler):
@@ -67,7 +69,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/library.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -77,9 +79,11 @@ def make_server(engine, port=8765):
                         data = data.replace(b'__TOKEN__', token.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
+                if u.path == '/api/library': return self.send(library.get(q['scan'][0]) if 'scan' in q else {'scans':library.listing()})
+                if u.path == '/api/library-image': return self.send(library.artifact(q['preview'][0]).read_bytes(),mime='image/png')
                 if u.path == '/api/onboarding': return self.send(dict(onboarding.runtime.status(), jobs=onboarding.recent()))
                 if u.path == '/api/onboarding-job': return self.send(onboarding.job(q.get('job', [''])[0]))
-                if u.path == '/api/state': return self.send({'projects':engine.list(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active)})
+                if u.path == '/api/state': return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active)})
                 if u.path == '/api/tops-schema':return self.send({'fields':TOPS_FIELDS})
                 if u.path == '/api/pair-schema':return self.send({'fields':FIELDS})
                 if u.path == '/api/mintpy-schema':return self.send(catalogue(q.get('environment',[None])[0] or None))
@@ -135,6 +139,9 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/library-scan': return self.send(library.scan(d['path'],d.get('environment') or defaults()['env']))
+                if self.path == '/api/library-preview': return self.send(library.preview(d))
+                if self.path == '/api/library-point': return self.send(library.point(d))
                 if self.path == '/api/setup-start':
                     if engine.active: raise ValueError('請等待目前的研究運算結束，再進行安裝或驗證。')
                     if any(j['status']=='running' for j in onboarding.jobs.values()):
