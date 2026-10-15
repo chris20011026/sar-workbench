@@ -50,15 +50,20 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding):
                          status_label='運算結束，待品質檢查' if scientific and status == 'complete' else label,
                          stage=stage, path=path, environment=environment, updated=timestamp(created),
                          error=error, action=action, scientific=scientific))
+        return rows[-1]
     for s in engine.list():
         c = s['config']; key = s['id']; history = s.get('history', [])
         name = c.get('name') or '未命名專案'
-        add('project', key, name, s['status'], s.get('stage', ''), c['root'], c.get('env', ''),
+        project = add('project', key, name, s['status'], s.get('stage', ''), c['root'], c.get('env', ''),
             history[-1].get('time', '') if history else s.get('created', 0), s.get('error', ''),
             dict(type='project', id=key), scientific=True)
         rows[-1]['workflow'] = names.get(c.get('workflow', 'alosStack'), c.get('workflow'))
+        active = getattr(engine, 'active', None) or ''
+        project['registration'] = dict(id=key, busy=project['group']=='running' or active==key or active.startswith(key+':'))
         try:
             for a in analyses.listing(key):
+                if a['status'] in ('running', 'checking', 'stopping', 'orphaned'):
+                    project['registration']['busy'] = True
                 label = 'MintPy 時間序列' if a['kind'] == 'mintpy' else '成果品質報告'
                 add('analysis', key+':'+a['id'], name+' · '+((a.get('options') or {}).get('name') or label),
                     a['status'], a.get('stage', ''), str(Path(c['root'])/'analyses'/a['id']), a.get('environment', ''),
@@ -67,7 +72,9 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding):
         except (OSError, ValueError, KeyError) as e:
             warnings.append(name+' 的分析紀錄暫時無法讀取：'+str(e))
     for s in engine.unavailable():
-        add('project', s['id'], Path(s['root']).name, 'unavailable', path=s['root'], error=s['reason'])
+        row = add('project', s['id'], Path(s['root']).name, 'unavailable', path=s['root'], error=s['reason'])
+        active = getattr(engine, 'active', None) or ''
+        row['registration'] = dict(id=s['id'], busy=active==s['id'] or active.startswith(s['id']+':'))
     for kind, manager in [('nisar', nisar_jobs), ('conversion', conversions)]:
         manager.reconcile()
         with manager.lock:
@@ -86,7 +93,8 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding):
         rows[-1]['workflow'] = label
     rank = {'running':0, 'attention':1, 'ready':2, 'complete':3, 'unavailable':4}
     rows.sort(key=lambda r: (rank[r['group']], -r['updated'], r['name'], r['key']))
-    return dict(records=rows, warnings=warnings, counts={g:sum(r['group']==g for r in rows) for g in rank})
+    return dict(records=rows, warnings=warnings, counts={g:sum(r['group']==g for r in rows) for g in rank},
+                removed_projects=engine.removed_projects())
 
 
 def source_candidates(value):

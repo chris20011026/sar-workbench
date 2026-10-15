@@ -139,7 +139,7 @@ class TopsWorkflow:
         c.update(reference=r['pair']['reference']['date'][2:],secondary=r['pair']['secondary']['date'][2:],source=c['reference_safe'],conda=find_conda(c['env']))
         root.mkdir(parents=True,exist_ok=True);(root/'proc').mkdir();(root/'.helper').mkdir()
         s=dict(id=uuid.uuid4().hex[:12],config=c,dates=[dict(date=c[k]) for k in ('reference','secondary')],tops_inventory=r['pair'],status='new',stage='TOPS 試驗專案已建立',history=[],excluded=[],completed_steps=[],tops_steps=[k for k,_ in STEPS],source_fingerprint=snapshot)
-        atomic_json(root/'.helper/tops-preflight.json',r);self.e.save(s);self.e.projects[s['id']]=str(root);atomic_json(self.e.registry,self.e.projects)
+        atomic_json(root/'.helper/tops-preflight.json',r);self.e.save(s);self.e.register(s['id'],root)
         return s
     def verify(self,s):
         if fingerprint(p['path'] for p in s['source_fingerprint'])!=s['source_fingerprint']:raise ValueError('來源、DEM 或環境紀錄已改變，請建立新專案。')

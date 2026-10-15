@@ -206,5 +206,30 @@ class MissionAPI(unittest.TestCase):
             check.assert_not_called()
         self.engine.active=None
 
+    def test_project_removal_and_restore_are_authenticated_and_persistent(self):
+        import urllib.error
+        root = self.base / 'already-deleted'
+        self.engine.register('project-id', root)
+        for path in ('/api/project-remove', '/api/project-restore'):
+            for headers in ({'X-Token':''}, {'Origin':'https://example.org'}):
+                with self.assertRaises(urllib.error.HTTPError) as e:
+                    self.request(path, {'id':'project-id'}, headers=headers)
+                self.assertEqual(e.exception.code,403)
+        self.engine.active='project-id:analysis'
+        with self.assertRaises(urllib.error.HTTPError) as e:
+            self.request('/api/project-remove', {'id':'project-id'})
+        self.assertEqual(e.exception.code,400)
+        self.assertTrue(self.request('/api/workspace')['records'][0]['registration']['busy'])
+        self.engine.active=None
+        record=self.request('/api/project-remove', {'id':'project-id'})
+        state=self.request('/api/workspace')
+        self.assertEqual(state['records'],[])
+        self.assertEqual(state['removed_projects'],[record])
+        self.request('/api/project-restore', {'token':record['token']})
+        state=self.request('/api/workspace')
+        self.assertEqual(state['removed_projects'],[])
+        self.assertEqual(state['records'][0]['status'],'unavailable')
+        self.assertFalse(root.exists())
+
 
 if __name__=='__main__':unittest.main()

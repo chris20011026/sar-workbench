@@ -13,8 +13,16 @@
  <div class="ws-heading"><div><div class="eyebrow">02 / CHOOSE A WORKFLOW</div><h2>研究目標與處理方式</h2></div><label class="ws-goal">顯示<select id="workspaceGoal"><option value="all">全部流程</option><option value="pair">兩期比較</option><option value="stack">多日期分析</option><option value="prepare">資料準備</option></select></label></div>
  <p class="hint">「已實作」表示介面與執行流程已提供；仍需通過專案健檢與科學品質檢查。規劃中的流程不能啟動。</p><div id="workspaceFlows" class="ws-flows"></div><div class="notice">MintPy 由已完成的 ALOS-2 多日期專案接續，請從專案總覽開啟原專案，再建立分析版本。</div>`;
  main.append(dashboard,chooser);
+ const registryNotice=node('div',undefined,'ws-registry-notice');registryNotice.id='registryNotice';registryNotice.hidden=true;registryNotice.setAttribute('role','status');
+ $('overviewRecords').before(registryNotice);
+ const removedPanel=node('details',undefined,'card ws-removed');removedPanel.id='removedProjects';removedPanel.hidden=true;
+ removedPanel.innerHTML='<summary id="removedProjectsSummary">已移除的專案</summary><p class="hint">這裡只保留專案的清單紀錄。復原會讓專案重新顯示，不會救回已刪除的檔案。</p><div id="removedProjectsList"></div>';
+ dashboard.append(removedPanel);
+ const removeDialog=node('dialog',undefined,'ws-remove-dialog');removeDialog.id='removeProjectDialog';removeDialog.setAttribute('aria-labelledby','removeProjectTitle');removeDialog.setAttribute('aria-describedby','removeProjectDescription');
+ removeDialog.innerHTML='<h2 id="removeProjectTitle">從工作台移除專案？</h2><p id="removeProjectName"></p><p id="removeProjectPath" class="ws-path"></p><p id="removeProjectDescription">專案及其 MintPy／品質報告會從總覽隱藏。磁碟上的資料、成果和科學環境會保留；之後可從「已移除的專案」復原清單紀錄。</p><p id="removeProjectError" class="error" role="alert"></p><div class="ws-dialog-actions"><button id="cancelProjectRemoval" autofocus>取消</button><button id="confirmProjectRemoval" class="ws-remove-button">移除紀錄</button></div>';
+ document.body.append(removeDialog);
  const nav=['openOverview','newProject','openLibrary','openWelcome'];
- let snapshot=null,flows=[],probe=null,probeVersion=0,loading=false,environmentLoading=false;
+ let snapshot=null,flows=[],probe=null,probeVersion=0,loading=null,environmentLoading=false,pendingRemoval=null,removing=false;
  const maturity={implemented:'已實作',experimental:'試驗中',planned:'規劃中',preparation:'僅資料準備'};
  const environmentNames={isce:'ISCE2',mintpy:'MintPy',isce3:'ISCE3／NISAR'};
  function navState(id){for(const key of nav){$(key).classList.toggle('active',key===id);if(key===id)$(key).setAttribute('aria-current','page');else $(key).removeAttribute('aria-current');}}
@@ -43,13 +51,34 @@
    if(r.error)card.append(node('p',r.error,'ws-error'));
    const footer=node('div',undefined,'ws-record-footer');
    footer.append(node('span',r.updated?new Date(r.updated*1000).toLocaleString('zh-TW'):'未記錄時間','hint'));
-   if(r.action)footer.append(button(['running','attention'].includes(r.group)?'查看目前階段':'開啟工作',()=>route(r.action)));
-   else footer.append(node('span','確認磁碟連線或原資料夾位置後，按「更新紀錄」。','hint'));
+   const actions=node('div',undefined,'ws-record-actions');
+   if(r.action)actions.append(button(['running','attention'].includes(r.group)?'查看目前階段':'開啟工作',()=>route(r.action)));
+   if(r.registration){const remove=button('從工作台移除',()=>askRemove(r),'ws-remove-button');remove.disabled=r.registration.busy;remove.setAttribute('aria-label','從工作台移除「'+r.name+'」');if(remove.disabled)remove.title='請先等待專案與分析運算完成，或停止工作。';actions.append(remove);}
+   footer.append(actions);
+   if(!r.action)card.append(node('p','若資料已不需要，可從工作台移除這筆紀錄；暫時離線則可保留。','hint'));
    card.append(footer);box.append(card);
   }
  }
  function drawMetrics(){const box=$('overviewMetrics');box.replaceChildren();for(const [group,label,value] of [['','全部工作',snapshot.records.length],['running','進行中',snapshot.counts.running],['attention','需要處理',snapshot.counts.attention],['complete','已完成',snapshot.counts.complete]]){const b=button('',()=>{$('overviewStatus').value=group;drawRecords();},'ws-metric');b.append(node('strong',String(value)),node('span',label));box.append(b);}}
- async function loadOverview(){if(loading)return;loading=true;try{const next=await api('/api/workspace');const changed=JSON.stringify(next)!==JSON.stringify(snapshot);snapshot=next;flows=snapshot.workflows;if(changed){drawMetrics();drawRecords();}else if($('overviewMessage').dataset.failed){drawRecords();}delete $('overviewMessage').dataset.failed;}catch(e){$('overviewMessage').dataset.failed='true';$('overviewMessage').textContent='暫時無法更新；保留上次顯示的紀錄。'+e.message;}finally{loading=false;}}
+ function loadOverview(){if(loading)return loading;loading=(async()=>{try{const next=await api('/api/workspace');const changed=JSON.stringify(next)!==JSON.stringify(snapshot);snapshot=next;flows=snapshot.workflows;if(changed){drawMetrics();drawRecords();drawRemoved();}else if($('overviewMessage').dataset.failed){drawRecords();}delete $('overviewMessage').dataset.failed;}catch(e){$('overviewMessage').dataset.failed='true';$('overviewMessage').textContent='暫時無法更新；保留上次顯示的紀錄。'+e.message;}finally{loading=null;}})();return loading;}
+ async function reloadRegistry(){if(loading)await loading;await loadOverview();}
+ function registrationNotice(text,record){registryNotice.replaceChildren(node('span',text));if(record)registryNotice.append(button('復原清單紀錄',()=>restoreProject(record)));registryNotice.hidden=false;}
+ function askRemove(record){pendingRemoval=record;$('removeProjectName').textContent=record.name;$('removeProjectPath').textContent=record.path;$('removeProjectError').textContent='';removeDialog.showModal();$('cancelProjectRemoval').focus();}
+ $('cancelProjectRemoval').onclick=()=>removeDialog.close();removeDialog.addEventListener('cancel',e=>{if(removing)e.preventDefault();});
+ action($('confirmProjectRemoval'),async()=>{
+  if(removing||!pendingRemoval)return;removing=true;$('cancelProjectRemoval').disabled=$('confirmProjectRemoval').disabled=true;$('removeProjectError').textContent='';
+  try{const record=await api('/api/project-remove',{id:pendingRemoval.registration.id});removeDialog.close();await reloadRegistry();registrationNotice('已從工作台移除「'+record.name+'」。',record);$('overviewReload').focus();}
+  catch(e){$('removeProjectError').textContent=e.message;}
+  finally{removing=false;$('cancelProjectRemoval').disabled=$('confirmProjectRemoval').disabled=false;}
+ });
+ async function restoreProject(record){
+  const buttons=[...registryNotice.querySelectorAll('button'),...removedPanel.querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);
+  try{await api('/api/project-restore',{token:record.token});await reloadRegistry();registrationNotice('已復原「'+record.name+'」的清單紀錄。若原資料夾已刪除，仍會顯示位置無法讀取。');$('overviewReload').focus();}
+  finally{buttons.forEach(b=>b.disabled=false);}
+ }
+ function drawRemoved(){const rows=snapshot.removed_projects||[];removedPanel.hidden=!rows.length;$('removedProjectsSummary').textContent=`已移除的專案（${rows.length}）`;
+  const box=$('removedProjectsList');box.replaceChildren();for(const r of rows){const row=node('div',undefined,'ws-removed-row'),info=node('div');info.append(node('strong',r.name),node('p',r.root,'ws-path'),node('small',new Date(r.removed_at*1000).toLocaleString('zh-TW'),'hint'));row.append(info,button('復原清單紀錄',()=>restoreProject(r)));box.append(row);}
+ }
  window.openWorkspaceOverview=async()=>{enter(dashboard,'openOverview','專案總覽');await loadOverview();};
  action($('openOverview'),window.openWorkspaceOverview);action($('overviewReload'),loadOverview);
  $('overviewSearch').oninput=drawRecords;$('overviewStatus').onchange=$('overviewKind').onchange=drawRecords;

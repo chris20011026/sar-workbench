@@ -154,7 +154,8 @@ def make_server(engine, port=8765):
             # Serialize launch decisions across ISCE2, ISCE3 and environment setup.
             launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert',
                         '/api/demo-start', '/api/terrain-start', '/api/import-start',
-                        '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check')
+                        '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
+                        '/api/create', '/api/project-remove', '/api/project-restore')
             if self.path in launches:
                 with operation_lock: self.handle_post()
             else: self.handle_post()  # Native picker and previews must never block Stop.
@@ -164,6 +165,10 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/project-remove':
+                    return self.send(engine.unregister(d['id']))
+                if self.path == '/api/project-restore':
+                    return self.send(engine.restore_registration(d['token']))
                 if self.path == '/api/workspace-identify':
                     return self.send(identify(d['path'],d.get('environment') or defaults()['env'],library,onboarding))
                 if self.path == '/api/environment-check':

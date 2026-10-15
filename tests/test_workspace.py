@@ -24,7 +24,7 @@ class WorkspaceOverview(unittest.TestCase):
         n=dict(id='same', status='ready', config=dict(name='NISAR', root='/data/nisar', environment='/env/isce3'), created=20)
         c=dict(id='same', status='running', config=dict(name='格式副本', root='/data/copy'), created=30)
         before=copy.deepcopy([p,a,n,c])
-        engine=SimpleNamespace(list=lambda:[p], unavailable=lambda:[dict(id='missing',root='/offline/data',reason='offline')])
+        engine=SimpleNamespace(list=lambda:[p], unavailable=lambda:[dict(id='missing',root='/offline/data',reason='offline')], removed_projects=lambda:[])
         analyses=SimpleNamespace(listing=lambda _:[a])
         def manager(state):return SimpleNamespace(reconcile=lambda:None, lock=threading.Lock(), jobs={'same':state})
         prep=SimpleNamespace(recent=lambda:[dict(id='same',status='failed',kind='terrain',created=40,error='network')])
@@ -38,10 +38,13 @@ class WorkspaceOverview(unittest.TestCase):
         self.assertEqual(rows['nisar']['group'],'attention')
         self.assertEqual(rows['analysis']['action'],dict(type='analysis',id='same',run='same'))
         self.assertIsNone(r['records'][-1]['action'])
+        self.assertEqual(r['records'][-1]['registration'],dict(id='missing',busy=False))
+        self.assertEqual(rows['project']['registration'],dict(id='same',busy=False))
+        self.assertEqual(r['removed_projects'],[])
         self.assertEqual([p,a,n,c],before)
 
     def test_missing_analysis_does_not_hide_other_projects(self):
-        engine=SimpleNamespace(list=lambda:[dict(id='p',status='new',config=dict(name='Example',root='/data'))],unavailable=lambda:[])
+        engine=SimpleNamespace(list=lambda:[dict(id='p',status='new',config=dict(name='Example',root='/data'))],unavailable=lambda:[],removed_projects=lambda:[])
         analyses=SimpleNamespace(listing=Mock(side_effect=ValueError('invalid json')))
         empty=SimpleNamespace(reconcile=lambda:None,lock=threading.Lock(),jobs={})
         r=overview(engine,analyses,empty,empty,SimpleNamespace(recent=lambda:[]))

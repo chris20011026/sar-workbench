@@ -23,6 +23,7 @@ class Engine:
         self.home = Path(home); self.home.mkdir(parents=True, exist_ok=True)
         self.registry = self.home / 'projects.json'
         self.projects = json.loads(self.registry.read_text()) if self.registry.exists() else {}
+        self.registry_lock = threading.RLock()
         self.lock = threading.Lock(); self.process = None; self.active = None
         self.cancel = threading.Event()
         self.resume_phase = None
@@ -35,16 +36,76 @@ class Engine:
                 self.save(s)
 
     def get(self, key):
-        return json.loads((Path(self.projects[key]) / '.helper/state.json').read_text())
+        with self.registry_lock:
+            root = self.projects[key]
+        return json.loads((Path(root) / '.helper/state.json').read_text())
+
+    def register(self, key, root):
+        with self.registry_lock:
+            projects = dict(self.projects, **{key: str(root)})
+            atomic_json(self.registry, projects)
+            self.projects = projects
+
+    def unregister(self, key):
+        """Remove only the registration; retain a recovery record outside the project."""
+        with self.lock, self.registry_lock:
+            if key not in self.projects:
+                raise ValueError('專案已不在清單中，請更新紀錄。')
+            root = Path(self.projects[key])
+            if self.active == key or (self.active or '').startswith(key + ':'):
+                raise ValueError('此專案仍在運算，請先等待完成或停止工作。')
+            if process_alive(root / '.helper'):
+                raise ValueError('此專案仍有背景程序，請先確認運算已停止。')
+            name = root.name
+            try: name = self.get(key)['config'].get('name') or name
+            except (OSError, ValueError, KeyError): pass
+            record = dict(token=uuid.uuid4().hex, id=key, root=str(root), name=name, removed_at=time.time())
+            # Save recovery information first. A failed registry write leaves the
+            # registration intact in memory and on disk.
+            atomic_json(self.home / 'removed-projects' / (record['token'] + '.json'), record)
+            projects = {k: v for k, v in self.projects.items() if k != key}
+            atomic_json(self.registry, projects)
+            self.projects = projects
+            return record
+
+    def removed_projects(self):
+        with self.registry_lock:
+            records = {}
+            for path in (self.home / 'removed-projects').glob('*.json'):
+                try:
+                    record = json.loads(path.read_text())
+                    key = record['id']
+                    if key in self.projects: continue
+                    if key not in records or record['removed_at'] > records[key]['removed_at']:
+                        records[key] = record
+                except (OSError, ValueError, KeyError, TypeError): continue
+            return sorted(records.values(), key=lambda r: r['removed_at'], reverse=True)
+
+    def restore_registration(self, token):
+        if not isinstance(token, str) or not re.fullmatch(r'[0-9a-f]{32}', token):
+            raise ValueError('無效的復原紀錄。')
+        with self.registry_lock:
+            path = self.home / 'removed-projects' / (token + '.json')
+            if not path.is_file(): raise ValueError('找不到這筆復原紀錄，請更新清單。')
+            record = json.loads(path.read_text())
+            key, root = record['id'], record['root']
+            if key in self.projects or root in self.projects.values():
+                raise ValueError('專案已在清單中，無需再次復原。')
+            try: state = json.loads((Path(root) / '.helper/state.json').read_text())
+            except (OSError, ValueError): state = None
+            if state is not None and state.get('id') != key:
+                raise ValueError('原位置已是另一個專案，無法復原這筆登記。')
+            self.register(key, root)
+            return record
 
     def save(self, state):
         atomic_json(Path(state['config']['root']) / '.helper/state.json', state)
 
     def list(self):
         results = []
-        for k in self.projects:
+        for k in list(self.projects):
             try: results.append(self.get(k))
-            except (OSError, ValueError): continue
+            except (OSError, ValueError, KeyError): continue
         for s in results:
             s['can_retry_prepare'] = self.can_retry_prepare(s)
         return results
@@ -52,8 +113,9 @@ class Engine:
     def unavailable(self):
         """Keep missing/offline project registrations visible and untouched."""
         missing=[]
-        for key, root in self.projects.items():
+        for key, root in list(self.projects.items()):
             try: self.get(key)
+            except KeyError: continue  # Removed while a read-only overview was loading.
             except (OSError, ValueError):
                 missing.append(dict(id=key,root=str(root),reason='專案狀態無法讀取；請確認磁碟連線或資料夾是否已移動。'))
         return missing
@@ -125,7 +187,7 @@ class Engine:
         write_xml(c, root / 'proc/alosStack.xml')
         key = uuid.uuid4().hex[:12]
         state = dict(id=key, config=c, dates=dates, status='new', stage='等待準備', history=[], excluded=[], recovery_enabled=True)
-        self.save(state); self.projects[key] = str(root); atomic_json(self.registry, self.projects)
+        self.save(state); self.register(key, root)
         return state
 
     def paths(self, state):

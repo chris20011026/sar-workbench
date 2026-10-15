@@ -170,7 +170,7 @@ class PairWorkflow:
         root.mkdir(parents=True,exist_ok=True);(root/'proc').mkdir();(root/'.helper').mkdir()
         write_pair_xml(c,root/'proc/alos2App.xml')
         s=dict(id=uuid.uuid4().hex[:12],config=c,dates=selected,status='new',stage='雙日期專案已建立，等待準備',history=[],excluded=[],completed_steps=[],source_fingerprint=snapshot)
-        self.e.save(s);self.e.projects[s['id']]=str(root);atomic_json(self.e.registry,self.e.projects)
+        self.e.save(s);self.e.register(s['id'],root)
         return s
     def verify(self,s):
         if fingerprint(x['path'] for x in s['source_fingerprint'])!=s['source_fingerprint']:raise ValueError('來源資料或描述檔已變更，請重新建立專案。')
