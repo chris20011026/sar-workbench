@@ -25,7 +25,7 @@ class AnalysisTests(unittest.TestCase):
         geom=self.proc/'dates_resampled/181103/insar'
         for ext in ['hgt','lat','lon','los','wbd']:raster(geom/('181103'+suffix+'.'+ext))
         (geom.parent/'181103.track.xml').write_text('<track/>');(geom.parent/'f1_0480').mkdir();(geom.parent/'f1_0480/181103.frame.xml').write_text('<frame/>');(self.proc/'baseline').mkdir();(self.proc/'baseline/baseline_center.txt').write_text('baseline')
-        self.e=Engine(self.p/'registry');self.e.projects={'test':str(self.root)};self.e.save(self.s);self.a=Analyses(self.e)
+        self.e=Engine(self.p/'registry');self.e.save(self.s);self.e.register('test',self.root);self.a=Analyses(self.e)
     def tearDown(self):self.tmp.cleanup()
     def test_inventory_and_source_dimensions(self):
         inv=inventory(self.s);self.assertEqual((inv['width'],inv['height']),(3,2));self.assertEqual(len(inv['pairs']),3)
@@ -133,10 +133,27 @@ class AnalysisTests(unittest.TestCase):
         class Failed:
             pid=123
             def wait(self):return 9
+            def poll(self):return 9
         with patch('alosstack_helper.analysis.subprocess.Popen',return_value=Failed()):self.a.worker('test',j['id'],'quality')
         self.assertEqual(self.a.get('test',j['id'])['status'],'failed');self.assertEqual(self.e.get('test')['status'],'complete');self.assertIsNone(self.e.active)
     def test_unsupported_workflow_rejected(self):
         with self.assertRaisesRegex(ValueError,'尚未開放'):self.e.create({'workflow':'topsStack'})
+    def test_disconnected_analysis_preserves_original_completion_and_releases_lock(self):
+        with patch('threading.Thread.start'):j=self.a.create('test','quality',{})
+        root=self.root;away=self.p/'disconnected'
+        class Disconnected:
+            pid=123
+            def wait(self):
+                root.rename(away)
+                raise OSError('device disconnected')
+            def poll(self):return 1
+        with patch('alosstack_helper.analysis.subprocess.Popen',return_value=Disconnected()):self.a.worker('test',j['id'],'quality')
+        self.assertIsNone(self.e.active);self.assertFalse(root.exists())
+        away.rename(root)
+        self.assertEqual(self.e.get('test')['status'],'complete')
+        self.assertEqual(self.a.get('test',j['id'])['status'],'failed')
+        self.assertEqual(self.a.listing('test')[0]['status'],'failed')
+        self.assertIn('不會自動續跑',self.a.get('test',j['id'])['error'])
     def test_project_output_alias_keeps_log_authentication_and_content(self):
         (self.root/'.helper/run.log').write_text('已完成，原成果保留。\n')
         server=make_server(self.e,0);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()

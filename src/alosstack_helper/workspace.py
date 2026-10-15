@@ -32,6 +32,8 @@ STATUS = {
     'stopped': ('attention', '已停止'), 'cancelled': ('attention', '已停止'),
     'interrupted': ('attention', '服務曾中斷'), 'orphaned': ('attention', '前次程序仍在執行'),
     'complete': ('complete', '已完成'), 'unavailable': ('unavailable', '位置無法讀取'),
+    'offline': ('unavailable', '儲存裝置未連線'), 'relocated': ('attention', '已找到新位置'),
+    'wrong_disk': ('attention', '磁碟身分不符'),
 }
 
 
@@ -53,13 +55,16 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding):
         return rows[-1]
     for s in engine.list():
         c = s['config']; key = s['id']; history = s.get('history', [])
-        name = c.get('name') or '未命名專案'
+        name = s.get('display_name') or c.get('name') or '未命名專案'
         project = add('project', key, name, s['status'], s.get('stage', ''), c['root'], c.get('env', ''),
             history[-1].get('time', '') if history else s.get('created', 0), s.get('error', ''),
             dict(type='project', id=key), scientific=True)
         rows[-1]['workflow'] = names.get(c.get('workflow', 'alosStack'), c.get('workflow'))
         active = getattr(engine, 'active', None) or ''
         project['registration'] = dict(id=key, busy=project['group']=='running' or active==key or active.startswith(key+':'))
+        project.update(notes=s.get('notes', ''), storage=s.get('storage', {}))
+        if s.get('storage', {}).get('relocated'):
+            project.update(group='attention', status_label='位置已變更，待檢查')
         try:
             for a in analyses.listing(key):
                 if a['status'] in ('running', 'checking', 'stopping', 'orphaned'):
@@ -72,9 +77,12 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding):
         except (OSError, ValueError, KeyError) as e:
             warnings.append(name+' 的分析紀錄暫時無法讀取：'+str(e))
     for s in engine.unavailable():
-        row = add('project', s['id'], Path(s['root']).name, 'unavailable', path=s['root'], error=s['reason'])
+        row = add('project', s['id'], s.get('name') or Path(s['root']).name, s.get('status', 'unavailable'),
+                  stage=s.get('last_stage',''), path=s['root'], error=s['reason'])
         active = getattr(engine, 'active', None) or ''
         row['registration'] = dict(id=s['id'], busy=active==s['id'] or active.startswith(s['id']+':'))
+        row.update(notes=s.get('notes',''), storage=dict(volume=s.get('volume'), candidates=s.get('candidates',[])),
+                   workflow=names.get(s.get('workflow'), '專案紀錄'))
     for kind, manager in [('nisar', nisar_jobs), ('conversion', conversions)]:
         manager.reconcile()
         with manager.lock:

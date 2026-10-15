@@ -201,7 +201,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertFalse(self.rec.report()['can_recover'])
 
     def test_process_is_stopped_if_tracking_cannot_be_saved(self):
-        with patch('alosstack_helper.engine.atomic_json',side_effect=OSError('disk full')):
+        with patch('alosstack_helper.engine.atomic_existing_json',side_effect=OSError('disk full')):
             with self.assertRaises(OSError):self.e.run(self.s,['/bin/sleep','30'])
         self.assertIsNone(self.e.process)
 

@@ -4,7 +4,7 @@
  const main=document.querySelector('main');
  const dashboard=node('section');dashboard.id='workspaceOverview';dashboard.hidden=true;
  dashboard.innerHTML=`<div class="ws-heading"><div><div class="eyebrow">RESEARCH WORKSPACE</div><h1>研究專案總覽</h1><p class="intro">在同一處查看資料準備、干涉處理與時間序列。選擇工作，接續目前的階段。</p></div><button id="overviewCreate" class="primary">＋ 建立專案</button></div>
- <div id="overviewMetrics" class="ws-metrics"></div><div class="ws-toolbar"><label>搜尋工作<input id="overviewSearch" type="search" placeholder="專案、流程或資料夾"></label><label>狀態<select id="overviewStatus"><option value="">全部狀態</option><option value="running">進行中</option><option value="attention">需要處理</option><option value="ready">等待開始</option><option value="complete">已完成</option><option value="unavailable">位置無法讀取</option></select></label><label>類型<select id="overviewKind"><option value="">全部工作</option><option value="project">ISCE2 專案</option><option value="nisar">NISAR 專案</option><option value="analysis">MintPy／品質報告</option><option value="conversion">格式轉換</option><option value="preparation">資料準備／教學</option></select></label><button id="overviewReload">更新紀錄</button></div><p id="overviewMessage" role="status" class="hint"></p><div id="overviewRecords" class="ws-records"></div>`;
+ <div id="overviewMetrics" class="ws-metrics"></div><div class="ws-toolbar"><label>搜尋工作<input id="overviewSearch" type="search" placeholder="專案、流程或資料夾"></label><label>狀態<select id="overviewStatus"><option value="">全部狀態</option><option value="running">進行中</option><option value="attention">需要處理</option><option value="ready">等待開始</option><option value="complete">已完成</option><option value="unavailable">離線／位置無法讀取</option></select></label><label>類型<select id="overviewKind"><option value="">全部工作</option><option value="project">ISCE2 專案</option><option value="nisar">NISAR 專案</option><option value="analysis">MintPy／品質報告</option><option value="conversion">格式轉換</option><option value="preparation">資料準備／教學</option></select></label><button id="overviewReload">更新紀錄</button></div><p id="overviewMessage" role="status" class="hint"></p><div id="overviewRecords" class="ws-records"></div>`;
  const chooser=node('section');chooser.id='workspaceCreate';chooser.hidden=true;
  chooser.innerHTML=`<div class="eyebrow">NEW RESEARCH PROJECT</div><h1>從資料選擇合適的流程。</h1><p class="intro">先辨識資料，再選擇研究目標。熟悉資料的使用者，也可以直接選擇下方流程。</p>
  <div class="card ws-source"><div class="card-heading"><span class="number">01</span><div><h2>辨識我的資料 <small>選填</small></h2><p>支援 ALOS、Sentinel-1 IW SLC、NISAR。只讀取描述資料。</p></div></div>
@@ -13,6 +13,7 @@
  <div class="ws-heading"><div><div class="eyebrow">02 / CHOOSE A WORKFLOW</div><h2>研究目標與處理方式</h2></div><label class="ws-goal">顯示<select id="workspaceGoal"><option value="all">全部流程</option><option value="pair">兩期比較</option><option value="stack">多日期分析</option><option value="prepare">資料準備</option></select></label></div>
  <p class="hint">「已實作」表示介面與執行流程已提供；仍需通過專案健檢與科學品質檢查。規劃中的流程不能啟動。</p><div id="workspaceFlows" class="ws-flows"></div><div class="notice">MintPy 由已完成的 ALOS-2 多日期專案接續，請從專案總覽開啟原專案，再建立分析版本。</div>`;
  main.append(dashboard,chooser);
+ const headingActions=node('div',undefined,'ws-heading-actions'),createButton=$('overviewCreate');createButton.replaceWith(headingActions);headingActions.append(button('加入既有專案',()=>window.openExistingProject()),createButton);
  const registryNotice=node('div',undefined,'ws-registry-notice');registryNotice.id='registryNotice';registryNotice.hidden=true;registryNotice.setAttribute('role','status');
  $('overviewRecords').before(registryNotice);
  const removedPanel=node('details',undefined,'card ws-removed');removedPanel.id='removedProjects';removedPanel.hidden=true;
@@ -39,7 +40,7 @@
  }
  function drawRecords(){
   if(!snapshot)return;const query=$('overviewSearch').value.trim().toLowerCase(),status=$('overviewStatus').value,kind=$('overviewKind').value;
-  const selected=snapshot.records.filter(r=>(!status||r.group===status)&&(!kind||r.kind===kind)&&(!query||[r.name,r.path,r.workflow,r.stage].join(' ').toLowerCase().includes(query)));
+  const selected=snapshot.records.filter(r=>(!status||r.group===status)&&(!kind||r.kind===kind)&&(!query||[r.name,r.notes,r.path,r.workflow,r.stage].join(' ').toLowerCase().includes(query)));
   const box=$('overviewRecords');box.replaceChildren();
   $('overviewMessage').textContent=`顯示 ${selected.length} / ${snapshot.records.length} 筆工作。`+(snapshot.warnings.length?' '+snapshot.warnings.join('；'):'');
   if(!selected.length){showEmpty(box,snapshot.records.length?'沒有符合條件的工作':'還沒有研究專案',snapshot.records.length?'清除篩選':'建立第一個專案',snapshot.records.length?()=>{$('overviewSearch').value='';$('overviewStatus').value='';$('overviewKind').value='';drawRecords();}:window.openWorkspaceCreate);return;}
@@ -47,21 +48,25 @@
    const card=node('article',undefined,'card ws-record');card.append(node('span',r.status_label,'ws-status '+r.group),node('p',r.workflow||'專案紀錄','eyebrow'),node('h2',r.name));
    card.append(node('p',r.stage||'等待查看紀錄','ws-stage'));
    if(r.path)card.append(node('p',r.path,'ws-path'));
+   if(r.notes)card.append(node('p',r.notes,'ws-project-notes'));
+   if(r.storage?.volume)card.append(node('p','儲存裝置：'+r.storage.volume.label,'hint'));
+   if(r.storage?.relocated)card.append(node('p','位置已重新連結 · 啟動運算前仍需確認內部路徑。','notice'));
    if(r.environment){const details=node('details');details.append(node('summary','運算環境'),node('p',r.environment,'ws-path'));card.append(details);}
    if(r.error)card.append(node('p',r.error,'ws-error'));
    const footer=node('div',undefined,'ws-record-footer');
    footer.append(node('span',r.updated?new Date(r.updated*1000).toLocaleString('zh-TW'):'未記錄時間','hint'));
    const actions=node('div',undefined,'ws-record-actions');
    if(r.action)actions.append(button(['running','attention'].includes(r.group)?'查看目前階段':'開啟工作',()=>route(r.action)));
-   if(r.registration){const remove=button('從工作台移除',()=>askRemove(r),'ws-remove-button');remove.disabled=r.registration.busy;remove.setAttribute('aria-label','從工作台移除「'+r.name+'」');if(remove.disabled)remove.title='請先等待專案與分析運算完成，或停止工作。';actions.append(remove);}
+   if(r.registration){const manage=button(r.status==='relocated'?'確認找到的位置':'管理專案',()=>window.openProjectManager(r.registration.id));manage.setAttribute('aria-label','管理專案「'+r.name+'」');actions.append(manage);const remove=button('從工作台移除',()=>askRemove(r),'ws-remove-button');remove.disabled=r.registration.busy;remove.setAttribute('aria-label','從工作台移除「'+r.name+'」');if(remove.disabled)remove.title='請先等待專案與分析運算完成，或停止工作。';actions.append(remove);}
    footer.append(actions);
-   if(!r.action)card.append(node('p','若資料已不需要，可從工作台移除這筆紀錄；暫時離線則可保留。','hint'));
+   if(!r.action)card.append(node('p',r.status==='offline'?'接回磁碟後，本頁會自動重新檢查。':r.status==='relocated'?'已核對磁碟與專案代號，請在管理專案中確認新位置。':'可在管理專案重新選擇資料夾；不需要的紀錄也可移除。','hint'));
    card.append(footer);box.append(card);
   }
  }
  function drawMetrics(){const box=$('overviewMetrics');box.replaceChildren();for(const [group,label,value] of [['','全部工作',snapshot.records.length],['running','進行中',snapshot.counts.running],['attention','需要處理',snapshot.counts.attention],['complete','已完成',snapshot.counts.complete]]){const b=button('',()=>{$('overviewStatus').value=group;drawRecords();},'ws-metric');b.append(node('strong',String(value)),node('span',label));box.append(b);}}
  function loadOverview(){if(loading)return loading;loading=(async()=>{try{const next=await api('/api/workspace');const changed=JSON.stringify(next)!==JSON.stringify(snapshot);snapshot=next;flows=snapshot.workflows;if(changed){drawMetrics();drawRecords();drawRemoved();}else if($('overviewMessage').dataset.failed){drawRecords();}delete $('overviewMessage').dataset.failed;}catch(e){$('overviewMessage').dataset.failed='true';$('overviewMessage').textContent='暫時無法更新；保留上次顯示的紀錄。'+e.message;}finally{loading=null;}})();return loading;}
  async function reloadRegistry(){if(loading)await loading;await loadOverview();}
+ window.refreshWorkspaceRegistry=reloadRegistry;
  function registrationNotice(text,record){registryNotice.replaceChildren(node('span',text));if(record)registryNotice.append(button('復原清單紀錄',()=>restoreProject(record)));registryNotice.hidden=false;}
  function askRemove(record){pendingRemoval=record;$('removeProjectName').textContent=record.name;$('removeProjectPath').textContent=record.path;$('removeProjectError').textContent='';removeDialog.showModal();$('cancelProjectRemoval').focus();}
  $('cancelProjectRemoval').onclick=()=>removeDialog.close();removeDialog.addEventListener('cancel',e=>{if(removing)e.preventDefault();});
@@ -80,7 +85,7 @@
   const box=$('removedProjectsList');box.replaceChildren();for(const r of rows){const row=node('div',undefined,'ws-removed-row'),info=node('div');info.append(node('strong',r.name),node('p',r.root,'ws-path'),node('small',new Date(r.removed_at*1000).toLocaleString('zh-TW'),'hint'));row.append(info,button('復原清單紀錄',()=>restoreProject(r)));box.append(row);}
  }
  window.openWorkspaceOverview=async()=>{enter(dashboard,'openOverview','專案總覽');await loadOverview();};
- action($('openOverview'),window.openWorkspaceOverview);action($('overviewReload'),loadOverview);
+ action($('openOverview'),window.openWorkspaceOverview);action($('overviewReload'),async()=>{await api('/api/storage-refresh',{});await reloadRegistry();});
  $('overviewSearch').oninput=drawRecords;$('overviewStatus').onchange=$('overviewKind').onchange=drawRecords;
  setInterval(()=>{if(!dashboard.hidden&&!document.hidden)loadOverview();},5000);
 

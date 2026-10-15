@@ -231,5 +231,39 @@ class MissionAPI(unittest.TestCase):
         self.assertEqual(state['records'][0]['status'],'unavailable')
         self.assertFalse(root.exists())
 
+    def test_project_management_auth_import_identity_and_local_metadata(self):
+        import urllib.error
+        from alosstack_helper.core import atomic_json
+        root=self.base/'existing-project';(root/'proc').mkdir(parents=True)
+        state=dict(id='existing',status='complete',history=[],config=dict(root=str(root),name='Original',workflow='alosStack'))
+        atomic_json(root/'.helper/state.json',state)
+        for path in ('/api/project-preview','/api/project-attach','/api/project-edit','/api/storage-refresh'):
+            with self.assertRaises(urllib.error.HTTPError) as e:
+                self.request(path,{},headers={'Origin':'https://example.org'})
+            self.assertEqual(e.exception.code,403)
+        p=self.request('/api/project-preview',dict(path=str(root)))
+        self.assertEqual(p['id'],'existing');self.assertFalse(self.engine.projects)
+        with self.assertRaises(urllib.error.HTTPError):self.request('/api/project-attach',dict(id='wrong',path=str(root)))
+        self.request('/api/project-attach',dict(id=p['id'],path=p['path']))
+        self.request('/api/project-edit',dict(id='existing',name='台北研究',notes='外接硬碟測試'))
+        d=self.request('/api/project-details?id=existing')
+        self.assertEqual(d['name'],'台北研究');self.assertEqual(d['notes'],'外接硬碟測試')
+        self.assertEqual(json.loads((root/'.helper/state.json').read_text()),state)
+        row=self.request('/api/workspace')['records'][0]
+        self.assertEqual(row['name'],'台北研究');self.assertEqual(row['notes'],'外接硬碟測試')
+        with self.assertRaises(urllib.error.HTTPError) as e:self.request('/api/project-details?id=existing',headers={'X-Token':''})
+        self.assertEqual(e.exception.code,403)
+
+    def test_relinked_project_cannot_start_processing_with_stale_paths(self):
+        import urllib.error
+        from alosstack_helper.core import atomic_json
+        root=self.base/'moved-project';(root/'proc').mkdir(parents=True)
+        atomic_json(root/'.helper/state.json',dict(id='moved',status='ready',history=[],config=dict(root='/old/location',name='Moved',workflow='alosStack')))
+        self.request('/api/project-attach',dict(id='moved',path=str(root)))
+        for path,data in [('/api/action',dict(id='moved',action='run')),('/api/analysis-create',dict(id='moved',kind='mintpy'))]:
+            with self.assertRaises(urllib.error.HTTPError) as e:self.request(path,data)
+            self.assertIn('舊路徑',json.loads(e.exception.read())['error'])
+        self.assertIsNone(self.engine.active)
+
 
 if __name__=='__main__':unittest.main()

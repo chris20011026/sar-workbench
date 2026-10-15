@@ -15,6 +15,7 @@ from .core import (LOOKS, PAIR, atomic_json, declared_pairs, digest, inspect_dat
 from .inputs import prepare_raster
 from .environment import isolated_env
 from .recovery import Recovery, PHASES, process_alive
+from .storage import ProjectStorage, read_project, absolute, atomic_existing_json, WORKFLOWS
 
 RESOLVE_CONFIG_SCRIPT = "import sys, os, json\nsys.path.insert(0, os.path.join(os.environ['ISCE_STACK'], 'alosStack'))\nfrom StackPulic import loadStackUserParameters\nsys.argv = ['helper', 'alosStack.xml']\ns = loadStackUserParameters('alosStack.xml')\njson.dump(dict(estimate=bool(s.doIon), apply=bool(s.applyIon), subsequent=s.numberOfSubsequentDates, subsequent_ion=s.numberOfSubsequentDatesIon), open('helper_resolved.json', 'w'))\n"
 
@@ -24,6 +25,7 @@ class Engine:
         self.registry = self.home / 'projects.json'
         self.projects = json.loads(self.registry.read_text()) if self.registry.exists() else {}
         self.registry_lock = threading.RLock()
+        self.storage = ProjectStorage(self.home)
         self.lock = threading.Lock(); self.process = None; self.active = None
         self.cancel = threading.Event()
         self.resume_phase = None
@@ -31,20 +33,88 @@ class Engine:
         for key in self.projects:
             try: s = self.get(key)
             except (OSError, ValueError): continue
-            if s['status'] == 'running':
+            if s['status'] == 'running' and not s['storage']['relocated']:
                 s.update(status='failed', error='服務已中斷；請先檢查殘留運算與產物，不會自動重跑。')
                 self.save(s)
 
     def get(self, key):
         with self.registry_lock:
             root = self.projects[key]
-        return json.loads((Path(root) / '.helper/state.json').read_text())
+        info = self.storage.locate(key, root)
+        if info['status'] != 'online': raise ValueError(info['reason'])
+        state = info['state']
+        original = state['config']['root']
+        state['config']['root'] = str(absolute(root))
+        state['display_name'] = info['name']; state['notes'] = info['notes']
+        state['storage'] = dict(relocated=absolute(original)!=absolute(root), original_root=original,
+                                root=str(root), volume=info['volume'])
+        incident = self.home / 'interrupted-projects' / (key + '.json')
+        if incident.exists():
+            state.update(json.loads(incident.read_text()))
+        return state
 
     def register(self, key, root):
         with self.registry_lock:
             projects = dict(self.projects, **{key: str(root)})
             atomic_json(self.registry, projects)
             self.projects = projects
+            try: self.storage.remember(key, root, read_project(root, key))
+            except (OSError, ValueError): pass
+
+    def project_details(self, key):
+        info = self.storage.locate(key, self.projects[key])
+        state = info.pop('state', None)
+        if state:
+            info.update(original_root=state['config']['root'], workflow=state['config'].get('workflow', 'alosStack'),
+                        last_stage=state.get('stage', ''), last_status=state['status'], paths=self.storage.path_report(key, state))
+        return info
+
+    def edit_project(self, key, name, notes):
+        with self.registry_lock:
+            if key not in self.projects: raise ValueError('找不到這個專案。')
+            self.storage.edit(key, name, notes)
+        return self.project_details(key)
+
+    def preview_project(self, path, expected=None):
+        root = absolute(path); state = read_project(root, expected)
+        if state['config'].get('workflow', 'alosStack') not in WORKFLOWS or not (root/'proc').is_dir():
+            raise ValueError('請選擇由本工作台建立的 ISCE2 專案資料夾，需包含 .helper 與 proc。')
+        key = state['id']; entry = self.storage.entry(key)
+        return dict(id=key, path=str(root), name=entry.get('display_name') or state['config'].get('name') or root.name,
+                    workflow=state['config'].get('workflow', 'alosStack'), stage=state.get('stage', ''), status=state['status'],
+                    original_root=state['config']['root'], current_root=self.projects.get(key),
+                    relocated=absolute(state['config']['root'])!=root,
+                    volume=self.storage.binding(root), paths=self.storage.path_report(key, state))
+
+    def attach_project(self, path, expected):
+        with self.lock, self.registry_lock:
+            preview = self.preview_project(path, expected); key = preview['id']; root = preview['path']
+            if self.active == key or (self.active or '').startswith(key + ':'):
+                raise ValueError('此專案正在執行，不能切換資料夾。')
+            if process_alive(Path(root)/'.helper'):
+                raise ValueError('所選專案仍有背景程序，請先確認運算已結束。')
+            if any(k != key and absolute(p)==absolute(root) for k,p in self.projects.items()):
+                raise ValueError('此資料夾已登記為其他專案，請先檢查。')
+            if key in self.projects and self.projects[key] != root:
+                old = self.storage.locate(key, self.projects[key])
+                if old['status']=='online' and process_alive(Path(self.projects[key])/'.helper'):
+                    raise ValueError('原位置仍有背景程序，不能切換。')
+            self.register(key, root)
+            return self.project_details(key)
+
+    def require_processing_location(self, key, check_inputs=True):
+        state = self.get(key)
+        if state['storage']['relocated']:
+            raise ValueError('專案已連結到新位置，但原指令或檢查點可能仍引用舊路徑。目前可檢視成果；繼續原運算前請恢復原位置，或以新位置建立處理專案。')
+        missing = [r['label'] for r in self.storage.path_report(key, state) if r['status']!='online'] if check_inputs else []
+        if missing: raise ValueError('以下資料尚未連線或位置已變更：'+'、'.join(missing)+'。請開啟「管理專案」檢查。')
+        return state
+
+    def record_storage_interruption(self, state, error):
+        atomic_json(self.home/'interrupted-projects'/(state['id']+'.json'),
+                    dict(status='failed', stage='儲存裝置中斷，需要檢查',
+                         error='專案狀態無法寫回；已在本機保留中斷紀錄。接回磁碟後請檢查產物，不會自動續跑。 '+str(error),
+                         failed_action=state.get('failed_action', self.worker_action or 'run')))
 
     def unregister(self, key):
         """Remove only the registration; retain a recovery record outside the project."""
@@ -56,8 +126,9 @@ class Engine:
                 raise ValueError('此專案仍在運算，請先等待完成或停止工作。')
             if process_alive(root / '.helper'):
                 raise ValueError('此專案仍有背景程序，請先確認運算已停止。')
-            name = root.name
-            try: name = self.get(key)['config'].get('name') or name
+            entry = self.storage.entry(key)
+            name = entry.get('display_name') or entry.get('cached_name') or root.name
+            try: name = self.get(key).get('display_name') or name
             except (OSError, ValueError, KeyError): pass
             record = dict(token=uuid.uuid4().hex, id=key, root=str(root), name=name, removed_at=time.time())
             # Save recovery information first. A failed registry write leaves the
@@ -99,7 +170,20 @@ class Engine:
             return record
 
     def save(self, state):
-        atomic_json(Path(state['config']['root']) / '.helper/state.json', state)
+        if state.get('storage', {}).get('relocated'):
+            raise ValueError('位置已變更，原處理狀態保持不變。')
+        path = Path(state['config']['root']) / '.helper/state.json'
+        clean = {k:v for k,v in state.items() if k not in ('storage', 'display_name', 'notes', 'can_retry_prepare')}
+        if state['id'] in self.projects:
+            if absolute(self.projects[state['id']]) != absolute(state['config']['root']):
+                raise ValueError('專案登記位置已變更，停止寫入。')
+            if self.storage.volume_problem(self.storage.entry(state['id']).get('root_binding')):
+                raise ValueError('專案磁碟未連線，停止寫入。')
+            if path.exists(): read_project(path.parent.parent, state['id'])
+            elif self.storage.entry(state['id']): raise ValueError('專案狀態遺失，停止寫入。')
+            atomic_existing_json(path, clean)
+        else: atomic_json(path, clean)
+        (self.home/'interrupted-projects'/(state['id']+'.json')).unlink(missing_ok=True)
 
     def list(self):
         results = []
@@ -114,10 +198,8 @@ class Engine:
         """Keep missing/offline project registrations visible and untouched."""
         missing=[]
         for key, root in list(self.projects.items()):
-            try: self.get(key)
-            except KeyError: continue  # Removed while a read-only overview was loading.
-            except (OSError, ValueError):
-                missing.append(dict(id=key,root=str(root),reason='專案狀態無法讀取；請確認磁碟連線或資料夾是否已移動。'))
+            info = self.storage.locate(key, root)
+            if info['status'] != 'online': missing.append(info)
         return missing
 
     def can_retry_prepare(self, s):
@@ -222,7 +304,7 @@ class Engine:
             p = subprocess.Popen(args, cwd=cwd or proc, stdout=log, stderr=subprocess.STDOUT,
                                  env=env, start_new_session=True)
             self.process = p
-            try: atomic_json(meta/'worker-process.json', {'pgid':p.pid})
+            try: atomic_existing_json(meta/'worker-process.json', {'pgid':p.pid})
             except Exception:
                 try: os.killpg(p.pid,signal.SIGKILL)
                 except ProcessLookupError: pass
@@ -245,7 +327,7 @@ class Engine:
         with self.lock:
             if self.active:
                 raise ValueError('已有工作執行中，請等待或停止。')
-            s = self.get(key)
+            s = self.require_processing_location(key)
             if process_alive(self.paths(s)[2]):
                 raise ValueError('仍有先前工作留下的運算程序，請先確認已停止。')
             if s['config'].get('workflow')=='topsApp':
@@ -302,7 +384,7 @@ class Engine:
 
     def recovery_enable(self, key, enabled):
         with self.lock:
-            s=self.get(key)
+            s=self.require_processing_location(key)
             if self.active or process_alive(self.paths(s)[2]): raise ValueError('運算中不能變更復原保護。')
             if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review'):
                 raise ValueError('只能在多日期運算開始前或人工判讀時變更後續保護。')
@@ -314,8 +396,12 @@ class Engine:
             self.resume_phase=phase
         except Exception as e:
             s.update(status='failed',error=str(e),stage='復原已停止；現有資料已保留')
-            self.log(s,'RECOVERY ERROR: '+str(e));self.save(s)
-            with self.lock: self.active=None
+            try: self.log(s,'RECOVERY ERROR: '+str(e))
+            except OSError: pass
+            try: self.save(s)
+            except (OSError, ValueError) as error: self.record_storage_interruption(s,error)
+            finally:
+                with self.lock: self.active=None
             return
         self.worker(s,action)
 
@@ -457,12 +543,15 @@ class Engine:
             s.update(failed_phase=s.get('stage'),status='failed', error=str(e), stage='已停止，需要檢查', failed_action=action)
             if s.pop('retry_first_snapshot',False):
                 s.update(status='ready',stage='尚未開始 cmd1；請處理副本問題後重試，或關閉復原保護')
-            self.log(s, 'ERROR: '+str(e))
+            try: self.log(s, 'ERROR: '+str(e))
+            except OSError: pass
         finally:
             self.resume_phase=None
             self.worker_action=None
-            self.save(s)
-            with self.lock: self.active = None
+            try: self.save(s)
+            except (OSError, ValueError) as error: self.record_storage_interruption(s, error)
+            finally:
+                with self.lock: self.active = None
 
     def review(self, s, excluded):
         _, proc, _ = self.paths(s)

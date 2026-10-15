@@ -4,6 +4,7 @@ import json, os, re, signal, subprocess, threading, time, uuid, shutil, hashlib
 from .core import atomic_json, digest, find_conda
 from .environment import isolated_env
 from .workflows import inventory, options
+from .storage import atomic_existing_json
 
 WORKER=Path(__file__).with_name('science_worker.py')
 
@@ -40,20 +41,29 @@ class Analyses:
         base=self.base(key);p=base/run
         if p.is_symlink() or base.is_symlink():raise ValueError('分析資料夾不能是符號連結。')
         return p
-    def get(self,key,run):return json.loads((self.folder(key,run)/'analysis.json').read_text())
+    def interruption(self,key,run):
+        path=self.engine.home/'interrupted-analyses'/(key+'-'+run+'.json')
+        return json.loads(path.read_text()) if path.exists() else {}
+    def get(self,key,run):
+        job=json.loads((self.folder(key,run)/'analysis.json').read_text())
+        job.update(self.interruption(key,run));return job
     def listing(self,key):
         base=self.base(key)
         if not base.exists():return []
         result=[]
         for f in sorted(base.glob('*/analysis.json'),key=lambda p:p.stat().st_mtime,reverse=True):
             try:
-                d=json.loads(f.read_text());result.append({k:d.get(k) for k in ['id','kind','status','stage','created','error','options','environment','history']})
+                d=json.loads(f.read_text());d.update(self.interruption(key,f.parent.name));result.append({k:d.get(k) for k in ['id','kind','status','stage','created','error','options','environment','history']})
             except (ValueError,OSError):continue
         return result
     def reconcile(self):
         if self.engine.active:return
         for key in self.engine.projects:
-            for item in self.listing(key):
+            try:
+                if self.engine.get(key).get('storage',{}).get('relocated'): continue
+                items = self.listing(key)
+            except (OSError, ValueError, KeyError): continue
+            for item in items:
                 if item['status']!='running':continue
                 p=self.folder(key,item['id']);pid=p/'worker.pid'
                 if pid.exists():
@@ -61,16 +71,16 @@ class Analyses:
                     except ProcessLookupError:pass
                     except (ValueError,PermissionError):return
                     else:return  # Existing process is left alone; reserve rejects a second job.
-                job=self.get(key,item['id']);job.update(status='failed',stage='服務曾中斷',error='保留現有輸出。請檢查分析日誌後建立新版本，不會自動接續半成品。');atomic_json(p/'analysis.json',job)
+                job=self.get(key,item['id']);job.update(status='failed',stage='服務曾中斷',error='保留現有輸出。請檢查分析日誌後建立新版本，不會自動接續半成品。');atomic_existing_json(p/'analysis.json',job)
     def reserve(self):
         self.reconcile()
-        if any(r['status']=='running' for key in self.engine.projects for r in self.listing(key)):
+        if any(r['status']=='running' for s in self.engine.list() for r in self.listing(s['id'])):
             raise ValueError('仍有背景分析，請確認原本的工作已結束。')
         if self.engine.active:raise ValueError('已有工作執行中，請等待完成。')
     def create(self,key,kind,data):
         if kind not in ('quality','mintpy'):raise ValueError('未知分析種類。')
         with self.engine.lock:
-            self.reserve();s=self.engine.get(key);inv=inventory(s)
+            self.reserve();s=self.engine.require_processing_location(key,check_inputs=False);inv=inventory(s)
             env=Path(data.get('environment') or s['config']['env']).expanduser().resolve()
             if not (env/'bin/python').is_file():raise ValueError('找不到分析環境的 Python。')
             conda = find_conda(env)
@@ -99,7 +109,7 @@ class Analyses:
             return job
     def invert(self,key,run,data):
         with self.engine.lock:
-            self.reserve();p=self.folder(key,run);job=self.get(key,run)
+            self.reserve();self.engine.require_processing_location(key,check_inputs=False);p=self.folder(key,run);job=self.get(key,run)
             if job['kind']!='mintpy' or job['status']!='loaded':raise ValueError('請先完成載入。失敗分析請建立新版本，不覆寫半成品。')
             if not data.get('reviewed'):raise ValueError('請先確認配對、覆蓋與參考設定。')
             if fingerprint(job['inventory']['files'])!=job['source_fingerprint']:raise ValueError('来源影像或 metadata 已改變，請建立新分析版本。')
@@ -120,8 +130,9 @@ class Analyses:
         if not conda:raise ValueError('所選分析環境已移除，請重新安裝或選擇其他環境。')
         return [conda,'run','--no-capture-output','-p',job['environment'],'python',str(WORKER),*args]
     def worker(self,key,run,mode):
-        p=self.folder(key,run);job=self.get(key,run)
+        p=None;job=None;process=None
         try:
+            p=self.folder(key,run);job=self.get(key,run)
             cache=p/'cache';cache.mkdir(exist_ok=True)
             with (p/'run.log').open('a') as log:
                 command=self.command(job,[mode,str(p/'analysis.json')])
@@ -137,11 +148,25 @@ class Analyses:
             if fingerprint(job['inventory']['files'])!=job['source_fingerprint']:raise RuntimeError('分析期間來源檔案改變，結果不能標示完成。')
             job.update(status='loaded' if mode=='load' else 'complete',stage={'load':'資料已載入，等待確認參考點','invert':'時序分析完成，請檢查品質','quality':'品質檢查完成'}[mode])
         except Exception as e:
-            job=self.get(key,run);job.update(status='failed',stage='需要檢查',error=str(e))
+            if process and process.poll() is None:
+                try:
+                    os.killpg(process.pid,signal.SIGTERM);process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid,signal.SIGKILL);process.wait()
+                except ProcessLookupError: pass
+            if job: job.update(status='failed',stage='需要檢查',error=str(e))
         finally:
-            atomic_json(p/'analysis.json',job)
-            (p/'worker.pid').unlink(missing_ok=True)
-            with self.engine.lock:self.engine.active=None;self.engine.process=None
+            try:
+                if p is None or job is None: raise ValueError('分析開始前儲存位置已中斷。')
+                self.engine.get(key)  # Check identity before writing to a reconnected path.
+                atomic_existing_json(p/'analysis.json',job)
+                (p/'worker.pid').unlink(missing_ok=True)
+            except (OSError, ValueError) as error:
+                atomic_json(self.engine.home/'interrupted-analyses'/(key+'-'+run+'.json'),
+                            dict(status='failed',stage='分析儲存中斷，需要檢查',
+                                 error='分析狀態無法寫回，已在本機保留紀錄。接回磁碟後可查看產物並另建分析版本；不會自動續跑。 '+str(error)))
+            finally:
+                with self.engine.lock:self.engine.active=None;self.engine.process=None
     def details(self,key,run):
         p=self.folder(key,run);job=self.get(key,run)
         for name in ('quality','loaded','results'):

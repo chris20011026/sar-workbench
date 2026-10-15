@@ -78,7 +78,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -90,6 +90,8 @@ def make_server(engine, port=8765):
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
                 if u.path == '/api/workspace':
                     return self.send(dict(overview(engine,analyses,nisar_jobs,conversion_jobs,onboarding), workflows=workflow_catalogue()))
+                if u.path == '/api/project-details':
+                    return self.send(engine.project_details(q['id'][0]))
                 if u.path == '/api/environment-status':
                     return self.send(dict(environments=environment_checks.catalogue(defaults()['environments'], ready_environment()), managed=onboarding.runtime.status()))
                 if u.path == '/api/nisar': return self.send(nisar_jobs.get(q['job'][0]) if 'job' in q else dict(jobs=nisar_jobs.listing(), fields=NISAR_FIELDS, version=NISAR_VERSION, busy=bool(nisar_jobs.active)))
@@ -155,7 +157,7 @@ def make_server(engine, port=8765):
             launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert',
                         '/api/demo-start', '/api/terrain-start', '/api/import-start',
                         '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
-                        '/api/create', '/api/project-remove', '/api/project-restore')
+                        '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach')
             if self.path in launches:
                 with operation_lock: self.handle_post()
             else: self.handle_post()  # Native picker and previews must never block Stop.
@@ -165,6 +167,14 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/storage-refresh':
+                    engine.storage.mounts(force=True); return self.send({'ok':True})
+                if self.path == '/api/project-preview':
+                    return self.send(engine.preview_project(d['path'], d.get('id')))
+                if self.path == '/api/project-attach':
+                    return self.send(engine.attach_project(d['path'], d['id']))
+                if self.path == '/api/project-edit':
+                    return self.send(engine.edit_project(d['id'], d['name'], d.get('notes', '')))
                 if self.path == '/api/project-remove':
                     return self.send(engine.unregister(d['id']))
                 if self.path == '/api/project-restore':
@@ -223,6 +233,7 @@ def make_server(engine, port=8765):
                     return self.send(tops_preflight(s['config'],existing=True) if s['config'].get('workflow')=='topsApp' else check_project(s['config'], existing=True))
                 if self.path == '/api/recovery-enable':
                     if type(d.get('enabled')) is not bool: raise ValueError('請選擇是否啟用保護。')
+                    engine.require_processing_location(d['id'])
                     engine.recovery_enable(d['id'],d['enabled']); return self.send({'ok':True})
                 if self.path == '/api/create':
                     if d.get('workflow')=='topsApp':return self.send(engine.create(d))
@@ -232,8 +243,10 @@ def make_server(engine, port=8765):
                     atomic_json(engine.paths(s)[2]/'preflight.json', report)
                     if confirmation: atomic_json(engine.paths(s)[2]/'confirmation.json',confirmation)
                     return self.send(s)
-                if self.path == '/api/analysis-create': return self.send(analyses.create(d['id'],d['kind'],d))
-                if self.path == '/api/analysis-invert': return self.send(analyses.invert(d['id'],d['run'],d))
+                if self.path == '/api/analysis-create':
+                    return self.send(analyses.create(d['id'],d['kind'],d))
+                if self.path == '/api/analysis-invert':
+                    return self.send(analyses.invert(d['id'],d['run'],d))
                 if self.path == '/api/analysis-point': return self.send(analyses.point(d['id'],d['run'],d['y'],d['x']))
                 if self.path == '/api/survey':return self.send(analyses.survey(d['id'],d))
                 if self.path == '/api/geo-view':return self.send(analyses.geo_view(d['id'],d['run']))
@@ -242,7 +255,7 @@ def make_server(engine, port=8765):
                 if self.path == '/api/geo-figure':return self.send(analyses.geo_figure(d['id'],d['run'],d))
                 if self.path == '/api/analysis-rename':return self.send(analyses.rename(d['id'],d['run'],d['name']))
                 if self.path == '/api/action':
-                    s = engine.get(d['id'])
+                    s = engine.require_processing_location(d['id'])
                     if s['config'].get('workflow')=='topsApp':
                         TopsWorkflow(engine).verify(s)
                         engine.launch(d['id'],d['action'],options=d);return self.send({'ok':True})
