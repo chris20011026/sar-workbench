@@ -34,6 +34,7 @@ from .confirmation import Confirmations, saved_review, verify_saved_inputs
 from .workspace import overview, workflow_catalogue, identify
 from .environment_checks import EnvironmentChecks
 from .storage_usage import StorageUsage
+from .migration import Migrations
 from . import DISPLAY_VERSION
 
 STATIC = Path(__file__).parent/'static'
@@ -61,6 +62,13 @@ def make_server(engine, port=8765):
     environment_checks = EnvironmentChecks(engine.home)
     confirmations = Confirmations()
     storage_usage = StorageUsage(engine)
+    migrations = Migrations(engine)
+    migration_writes = ('/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/create',
+                        '/api/project-remove', '/api/project-attach', '/api/recovery-enable',
+                        '/api/analysis-rename', '/api/survey', '/api/geo-view', '/api/geo-point',
+                        '/api/geo-export', '/api/geo-figure', '/api/setup-start', '/api/demo-start',
+                        '/api/terrain-start', '/api/import-start', '/api/nisar-create', '/api/nisar-run',
+                        '/api/alos4-conversion-create', '/api/alos4-conversion-run')
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
         def send(self, value, status=200, mime='application/json'):
@@ -81,7 +89,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -93,11 +101,15 @@ def make_server(engine, port=8765):
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
                 if u.path == '/api/workspace':
-                    return self.send(dict(overview(engine,analyses,nisar_jobs,conversion_jobs,onboarding), workflows=workflow_catalogue()))
+                    moving = migrations.busy()
+                    return self.send(dict(overview(engine,analyses,nisar_jobs,conversion_jobs,onboarding), workflows=workflow_catalogue(),
+                                          migration=migrations.get(moving)['transfer'] if moving else None))
                 if u.path == '/api/project-details':
                     return self.send(engine.project_details(q['id'][0]))
                 if u.path == '/api/storage-usage':
                     return self.send(storage_usage.get(q['id'][0]))
+                if u.path == '/api/migration':
+                    return self.send(migrations.get(q['id'][0]))
                 if u.path == '/api/environment-status':
                     return self.send(dict(environments=environment_checks.catalogue(defaults()['environments'], ready_environment()), managed=onboarding.runtime.status()))
                 if u.path == '/api/nisar': return self.send(nisar_jobs.get(q['job'][0]) if 'job' in q else dict(jobs=nisar_jobs.listing(), fields=NISAR_FIELDS, version=NISAR_VERSION, busy=bool(nisar_jobs.active)))
@@ -108,7 +120,7 @@ def make_server(engine, port=8765):
                 if u.path == '/api/onboarding-job': return self.send(onboarding.job(q.get('job', [''])[0]))
                 if u.path == '/api/state':
                     nisar_jobs.reconcile(); conversion_jobs.reconcile()
-                    return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active or nisar_jobs.active or conversion_jobs.active)})
+                    return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active or nisar_jobs.active or conversion_jobs.active or migrations.busy())})
                 if u.path == '/api/tops-schema':return self.send({'fields':TOPS_FIELDS})
                 if u.path == '/api/pair-schema':return self.send({'fields':FIELDS})
                 if u.path == '/api/mintpy-schema':return self.send(catalogue(q.get('environment',[None])[0] or None))
@@ -163,7 +175,8 @@ def make_server(engine, port=8765):
             launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert',
                         '/api/demo-start', '/api/terrain-start', '/api/import-start',
                         '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
-                        '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach', '/api/storage-usage-start')
+                        '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach', '/api/storage-usage-start',
+                        '/api/migration-plan', '/api/migration-copy', '/api/migration-switch', '/api/migration-abandon') + migration_writes
             if self.path in launches:
                 with operation_lock: self.handle_post()
             else: self.handle_post()  # Native picker and previews must never block Stop.
@@ -173,6 +186,18 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path in migration_writes and migrations.busy():
+                    raise ValueError('專案安全搬移進行中，請先完成或暫停搬移，再更改資料或啟動運算。')
+                if self.path in ('/api/migration-plan', '/api/migration-copy', '/api/migration-switch'):
+                    if engine.active or nisar_jobs.active or conversion_jobs.active or onboarding.runtime.status().get('status')=='running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先完成目前運算或安裝，再開始搬移。')
+                    if self.path.endswith('plan'):
+                        return self.send(migrations.plan(d['id'], d['parent'], d['name']))
+                    return self.send(migrations.start(d['id'], d['transfer'], self.path.rsplit('-',1)[1], d.get('consent')))
+                if self.path == '/api/migration-stop':
+                    migrations.stop(d['id']); return self.send(migrations.get(d['id']))
+                if self.path == '/api/migration-abandon':
+                    return self.send(migrations.abandon(d['id'], d['transfer']))
                 if self.path == '/api/storage-usage-start':
                     return self.send(storage_usage.start(d['id'], d.get('include_external', False)))
                 if self.path == '/api/storage-usage-stop':
@@ -284,6 +309,7 @@ def make_server(engine, port=8765):
             except Exception as e: self.send({'error':str(e)},400)
     class Server(ThreadingHTTPServer):
         def server_close(self):
+            migrations.stop()
             storage_usage.stop(shutdown=True)
             super().server_close()
     server = Server(('127.0.0.1',port),Handler)
@@ -291,6 +317,7 @@ def make_server(engine, port=8765):
     server.nisar_jobs = nisar_jobs
     server.conversion_jobs = conversion_jobs
     server.storage_usage = storage_usage
+    server.migrations = migrations
     return server
 
 def main():
@@ -320,6 +347,7 @@ def main():
         atomic_json(args.desktop_session, {'url':url, 'pid':os.getpid()})
     if not args.no_browser: webbrowser.open(url)
     def shutdown(*_):
+        server.migrations.stop()
         server.storage_usage.stop(shutdown=True)
         server.nisar_jobs.stop(shutdown=True)
         server.conversion_jobs.stop(shutdown=True)

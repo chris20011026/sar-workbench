@@ -42,6 +42,27 @@ class GeographyTests(unittest.TestCase):
         from science_worker import point_data
         with self.assertRaisesRegex(ValueError,'品質遮罩'):point_data(self.p/'analysis.json',0,2)
         with self.assertRaisesRegex(ValueError,'顯示門檻'):point_data(self.p/'analysis.json',3,3,.95)
+    def test_moved_analysis_reads_its_own_corrected_timeseries_without_original(self):
+        import shutil
+        from science_worker import point_data
+        old=self.p/'old';new=self.p/'moved';run='aaaaaaaaaaaa'
+        source=old/'analyses'/run;source.mkdir(parents=True)
+        for name in ('inputs','exports'):shutil.copytree(self.p/name,source/name)
+        for name in ('velocity.h5','maskTempCoh.h5','temporalCoherence.h5','timeseries.h5','analysis.json','results.json'):shutil.copy2(self.p/name,source/name)
+        # Corrected and uncorrected products differ; the reader must not guess.
+        (source/'timeseries.h5').rename(source/'timeseries_corrected.h5')
+        with h5py.File(source/'timeseries.h5','w') as f:f['timeseries']=np.zeros((3,8,9));f['date']=np.array(['20180101','20190101','20200101'],dtype='S8')
+        job=json.loads((source/'analysis.json').read_text());job['timeseries_file']=str(source/'timeseries_corrected.h5');(source/'analysis.json').write_text(json.dumps(job))
+        (old/'.helper').mkdir();(old/'.helper/state.json').write_text(json.dumps(dict(config=dict(root=str(old)))))
+        before=point_data(source/'analysis.json',3,3)
+        shutil.copytree(old,new);shutil.rmtree(old)
+        moved=new/'analyses'/run;after=point_data(moved/'analysis.json',3,3)
+        self.assertEqual(before,after);self.assertNotEqual(after['displacement_mm'][-1],0)
+        spec={**self.spec,'folder':str(moved),'out':str(moved/'exports')}
+        meta=geo.map_view(spec);self.assertIn('velocity',meta['layers'])
+        (moved/'timeseries_corrected.h5').unlink()
+        with self.assertRaises(FileNotFoundError):point_data(moved/'analysis.json',3,3)
+
     def test_export_crs_units_nodata_and_nearest_values(self):
         from osgeo import gdal,osr
         before=(self.p/'velocity.h5').read_bytes()

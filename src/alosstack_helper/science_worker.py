@@ -218,6 +218,22 @@ def invert(job_path):
     shutil.copy2(p/'mintpy.cfg',out/'mintpy.cfg');shutil.copy2(p/'velocity.h5',out/'velocity.h5')
     if (p/'parameter-report.json').is_file():shutil.copy2(p/'parameter-report.json',out/'parameter-report.json')
 
+def timeseries_path(job_path,job):
+    """Resolve this analysis's own output after a verified project copy.
+
+    Scientific config/pickles stay unchanged. Never fall back to a different
+    time-series product just because the originally selected one is missing.
+    """
+    saved=Path(job['timeseries_file']);p=job_path.parent
+    state=job_path.parents[2]/'.helper/state.json'
+    if state.is_file():
+        original=Path(json.loads(state.read_text())['config']['root'])/'analyses'/p.name
+        if saved.is_absolute() and saved.is_relative_to(original):
+            candidate=p/saved.relative_to(original)
+            if not candidate.resolve().is_relative_to(p.resolve()):raise ValueError('時間序列連結超出分析資料夾。')
+            return candidate
+    return saved
+
 def point_data(job_path,y,x,threshold=0):
     import h5py
     job=json.loads(job_path.read_text());p=job_path.parent
@@ -225,7 +241,7 @@ def point_data(job_path,y,x,threshold=0):
         a=f['mask'];
         if not 0<=y<a.shape[0] or not 0<=x<a.shape[1]:raise ValueError('位置超出影像範圍。')
         if not a[y,x]:raise ValueError('此位置未通過本次分析的品質遮罩。')
-    with h5py.File(job['timeseries_file'],'r') as f:
+    with h5py.File(timeseries_path(job_path,job),'r') as f:
         dates=[d.decode() for d in f['date'][:]];v=f['timeseries'][:,y,x]*1000
     if not np.isfinite(v).all():raise ValueError('非有限時間序列')
     with h5py.File(p/'inputs/geometryRadar.h5','r') as f:lat=float(f['latitude'][y,x]);lon=float(f['longitude'][y,x])

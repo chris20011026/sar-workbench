@@ -9,7 +9,9 @@
 
 「管理專案 → 儲存空間」可背景統計各類資料占用與磁碟可用空間，支援停止和離線查看上次結果；[計算方式與限制](docs/STORAGE_USAGE.md)。
 
-本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.7.0 beta 1**。新增 [Sentinel-1 TOPS 雙日期試驗流程](docs/SENTINEL_TOPS.md)：SAFE／ZIP 辨識、選区、精密軌道、共同 burst 檢查與階段執行。尚未完成真實 SLC 端到端驗證。
+「管理專案 → 安全搬移」可將已完成專案複製到新位置，逐檔驗證後再確認切換；支援暫停與接續，原專案保留。[搬移範圍與限制](docs/PROJECT_MIGRATION.md)。
+
+本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.7.0 beta 2**。新增 [Sentinel-1 TOPS 雙日期試驗流程](docs/SENTINEL_TOPS.md)：SAFE／ZIP 辨識、選区、精密軌道、共同 burst 檢查與階段執行。尚未完成真實 SLC 端到端驗證。
 
 | 工作流 | 狀態 |
 | --- | --- |
@@ -22,7 +24,7 @@
 | NISAR 雙日期（ISCE3） | 實驗功能；獨立環境，未完成真實 RSLC 全流程驗證 |
 | ALOS-4 格式轉換／混合資料健檢 | 實驗功能；不自動接續跨衛星干涉 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.7.0-beta.1) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.7.0-beta.2) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
 [第一次使用指南](docs/FIRST_USE.md) · [0.7 更新與驗證方式](docs/RELEASE_0.7.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 

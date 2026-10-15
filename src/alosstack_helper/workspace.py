@@ -64,7 +64,7 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding):
         project['registration'] = dict(id=key, busy=project['group']=='running' or active==key or active.startswith(key+':'))
         project.update(notes=s.get('notes', ''), storage=s.get('storage', {}))
         if s.get('storage', {}).get('relocated'):
-            project.update(group='attention', status_label='位置已變更，待檢查')
+            project.update(group='attention', status_label='位置已變更 · 可檢視成果')
         try:
             for a in analyses.listing(key):
                 if a['status'] in ('running', 'checking', 'stopping', 'orphaned'):

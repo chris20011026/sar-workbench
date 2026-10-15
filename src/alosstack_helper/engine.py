@@ -76,6 +76,8 @@ class Engine:
         return self.project_details(key)
 
     def preview_project(self, path, expected=None):
+        from .migration import require_finished_copy
+        require_finished_copy(path)
         root = absolute(path); state = read_project(root, expected)
         if state['config'].get('workflow', 'alosStack') not in WORKFLOWS or not (root/'proc').is_dir():
             raise ValueError('請選擇由本工作台建立的 ISCE2 專案資料夾，需包含 .helper 與 proc。')

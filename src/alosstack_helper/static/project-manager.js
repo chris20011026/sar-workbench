@@ -7,6 +7,7 @@
  <label>顯示名稱<input id="managerName" maxlength="100"></label><label>研究備註<textarea id="managerNotes" rows="3" maxlength="2000" placeholder="例如研究區、用途或資料來源"></textarea></label>
  <div class="inline"><button id="saveProjectDetails" class="primary">儲存名稱與備註</button><span id="managerSaved" role="status" class="hint"></span></div>
  <section class="storage-section"><div class="card-heading"><h3>儲存位置與連線</h3><button id="recheckProjectStorage">重新檢查連線</button></div><div id="managerConnection" role="status"></div><div id="managerCandidates"></div></section>
+ <section class="storage-section"><h3>安全搬移</h3><p>將運算已完成的專案複製到另一個位置，驗證成果後再切換。原專案會保留。</p><button id="openProjectMigration">開啟安全搬移精靈</button></section>
  <details class="storage-section" id="managerRelink"><summary>重新連結專案資料夾</summary><p class="hint">選擇原專案搬移後的位置。會核對專案代號，不搬移或複製影像。</p>
  <label>專案資料夾<span class="input-row"><input id="relinkPath" placeholder="選擇包含 proc 與 .helper 的資料夾"><button id="pickRelinkPath">選擇資料夾</button></span></label><button id="inspectRelink" class="storage-inspect">檢查這個位置</button><div id="relinkPreview"></div><button id="confirmRelink" class="primary" disabled>確認重新連結</button></details>
  <details class="storage-section"><summary>原始資料與地形路徑</summary><p class="hint">檢查來源、DEM、WBD 是否可讀。這裡不掃描影像內容，也不修改原處理設定。</p><div id="managerPaths"></div></details></section>`;
@@ -38,6 +39,7 @@
  };
  window.openExistingProject=()=>{$('existingError').textContent='';$('existingPath').value='';invalidate('existing');importer.showModal();};
  $('closeProjectManager').onclick=()=>dialog.close();$('closeExistingProject').onclick=()=>importer.close();
+ localAction('openProjectMigration','managerError',async()=>{const id=key,d=details;dialog.close();await window.openProjectMigration(id,d);});
  dialog.addEventListener('close',()=>{generation++;key=null;window.closeStorageUsage?.();});
  localAction('saveProjectDetails','managerError',async()=>{
   const id=key;$('saveProjectDetails').disabled=true;
