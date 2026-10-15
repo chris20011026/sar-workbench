@@ -1,7 +1,7 @@
 // Separate workflow panel. Never changes an existing ISCE2 project's settings.
 (()=>{
  const panel=node('section');panel.id='missionsPanel';panel.hidden=true;
- panel.innerHTML=`<div class="eyebrow">MISSION LAB · EXPERIMENTAL</div><h1>NISAR 與 ALOS-4</h1>
+ panel.innerHTML=`<div class="eyebrow">RESEARCH WORKFLOW · EXPERIMENTAL</div><h1 id="missionTitle">NISAR 雙日期</h1>
  <p class="intro">從資料檢查開始，保留每次設定與執行紀錄。NISAR 使用獨立的 ISCE3；ALOS 系列繼續使用 ISCE2。</p>
  <div class="mission-tabs" role="tablist" aria-label="衛星流程"><button id="missionNisarTab" role="tab" aria-selected="true">NISAR 雙日期</button><button id="missionAlosTab" role="tab" aria-selected="false">ALOS-2／ALOS-4</button></div>
  <div id="missionNisar"><div class="notice"><strong>實驗功能</strong><p>已提供資料健檢、設定產生及執行入口；完整 RSLC 科學處理仍待實際驗證。結果需核對對位、相干性、解纏連通區與電離層相位。預設使用 CPU，不會啟用 Apple GPU。</p></div>
@@ -18,12 +18,14 @@
  let fields=[],selected=null,timer=null,fetching=false,shownStamp='',report=null;
  const paths=[['reference','較早日期 · NISAR RSLC（.h5）','file'],['secondary','較晚日期 · NISAR RSLC（.h5）','file'],['dem','DEM（具地理參考的單波段 raster）','file'],['water','水體距離圖（選填，二元 0/1 遮罩不適用）','file'],['root','新專案資料夾（選上層後自動建立名稱）','dir']];
  for(const [key,text,mode] of paths){const label=node('label',text),row=node('span',undefined,'input-row'),input=node('input'),button=node('button',mode==='dir'?'選上層資料夾':'選檔案');input.id='nisar_'+key;input.required=key!=='water';button.type='button';action(button,()=>choosePath(mode,p=>{input.value=key==='root'?p+'/nisar-'+new Date().toISOString().replace(/[-:.TZ]/g,'').slice(0,14):p;},input.value||defaults.home));row.append(input,button);label.append(row);$('nisarPaths').append(label);}
+ window.openNisarJob=async id=>{selected=id;shownStamp='';await window.openNisar();tab(false);$('nisarDetail').scrollIntoView({behavior:'smooth',block:'start'});};
  window.closeMissions=()=>{panel.hidden=true;$('openMissions').classList.remove('active');if(timer){clearInterval(timer);timer=null;}};
- function tab(alos){$('missionAlos').hidden=!alos;$('missionNisar').hidden=alos;$('missionNisarTab').setAttribute('aria-selected',String(!alos));$('missionAlosTab').setAttribute('aria-selected',String(alos));}
+ function tab(alos){$('missionTitle').textContent=alos?'ALOS-2／ALOS-4 資料準備':'NISAR 雙日期';$('crumb').textContent='建立專案／'+$('missionTitle').textContent;$('missionAlos').hidden=!alos;$('missionNisar').hidden=alos;$('missionNisarTab').setAttribute('aria-selected',String(!alos));$('missionAlosTab').setAttribute('aria-selected',String(alos));}
  $('missionNisarTab').onclick=()=>tab(false);$('missionAlosTab').onclick=()=>tab(true);
  function environments(select,rows,flag){const old=select.value;select.replaceChildren();for(const e of rows.filter(e=>e[flag])){const op=node('option',e.name+' · '+e.path);op.value=e.path;select.append(op);}if([...select.options].some(o=>o.value===old))select.value=old;}
  window.openNisar=async(prefill={})=>{
-  current=null;window.closeLibrary?.();$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=true;panel.hidden=false;$('crumb').textContent='NISAR／ALOS-4 實驗室';for(const id of ['newProject','openWelcome'])$(id).classList.remove('active');$('openMissions').classList.add('active');clear();
+  window.leaveWorkspace?.('newProject');
+  current=null;window.closeLibrary?.();$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=true;panel.hidden=false;$('crumb').textContent='建立專案／NISAR 與 ALOS-4';for(const id of ['newProject','openWelcome'])$(id).classList.remove('active');$('newProject').classList.add('active');clear();
   const [state,data]=await Promise.all([api('/api/state'),api('/api/nisar')]);environments($('nisarEnv'),state.defaults.environments,'isce3');environments($('missionAlosEnv'),state.defaults.environments,'isce');
   $('nisarEnvNote').textContent=`本版核對版本：ISCE3 ${data.version}。`+($('nisarEnv').options.length?'沿用既有環境，這個檢查不會安裝套件。':'尚未找到 ISCE3；請指定已安裝的環境。ISCE2 一鍵安裝目前不包含此實驗模組。');
   if(!fields.length){fields=data.fields;for(const f of fields){const label=node('label',f.label),input=node(f.type==='choice'||f.type==='bool'?'select':'input');input.id='nisarOption_'+f.key;if(f.type==='choice'||f.type==='bool'){for(const value of f.type==='bool'?[false,true]:f.choices){const op=node('option',f.type==='bool'?(value?'開啟':'關閉'):value);op.value=String(value);input.append(op);}}else{input.type='number';input.min=f.min;input.max=f.max;input.step=f.type==='int'?'1':'any';}input.value=String(f.value);label.append(input,node('small',f.help,'hint'));$('nisarFields').append(label);}}
@@ -72,5 +74,6 @@
   if(s.status==='complete'){box.append(node('p','已完成格式副本；尚未驗證此產品的干涉品質。','notice'));const view=node('button','在資料瀏覽器檢查副本');action(view,()=>window.viewNisarProduct(s.result.output));box.append(view);}
   const details=node('details'),pre=node('pre',s.log||'等待開始');pre.id='conversionLog';details.append(node('summary','轉換日誌'),pre);details.open=s.status==='failed';box.append(details);
  }finally{conversionFetching=false;}}
+ window.openAlosPreparation=async(path='',id=null)=>{await window.openNisar();tab(true);if(path)$('missionAlosPath').value=path;if(id){conversionSelected=id;conversionStamp='';}await updateConversions();if(id)$('conversionDetail').scrollIntoView({behavior:'smooth',block:'start'});};
  $('missionAlosTab').addEventListener('click',()=>updateConversions().catch(fail));setInterval(()=>{if(!panel.hidden&&!$('missionAlos').hidden)updateConversions().catch(e=>{$('conversionNotice').textContent=e.message;});},3000);
 })();

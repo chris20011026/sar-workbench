@@ -1,6 +1,6 @@
 # SAR 研究工作台（SAR Workbench）
 
-**main 分支新增：[NISAR／ALOS-4 實驗室](docs/MISSION_LAB.md)**。提供 NISAR 雙日期的表單、健檢與執行入口，以及 ALOS-4 格式副本和跨衛星相容性檢查。真實 NISAR 全流程與混合 ALOS 自動接續尚待驗證；既有 Mac 下載包尚未包含這些新增功能。
+**main 分支新增：[統一工作空間](docs/WORKSPACE.md)與 [NISAR／ALOS-4 實驗流程](docs/MISSION_LAB.md)**。提供 NISAR 雙日期的表單、健檢與執行入口，以及 ALOS-4 格式副本和跨衛星相容性檢查。真實 NISAR 全流程與混合 ALOS 自動接續尚待驗證；既有 Mac 下載包尚未包含這些新增功能。
 
 新增：ALOS-2 正式中繼資料核對、候選分組、影像覆蓋地圖與地形範圍帶入。使用方式與限制見[影像匯入說明](docs/IMAGE_IMPORT.md)。
 
@@ -22,7 +22,7 @@
 
 [第一次使用指南](docs/FIRST_USE.md) · [0.6 更新與驗證方式](docs/RELEASE_0.6.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
-首頁提供合成教學、ALOS-2 ZIP／資料夾匯入與公開地形下載。真實 SAR 影像仍需自行取得，科學參考點與電離層品質仍需判讀。自動安裝使用 [insar-arm](https://github.com/chris20011026/insar-arm) 的固定套件，放在工作台專用資料夾；既有 Conda 環境與研究專案保持原設定。
+「工具與環境」提供合成教學、ALOS-2 ZIP／資料夾匯入與公開地形下載。真實 SAR 影像仍需自行取得，科學參考點與電離層品質仍需判讀。自動安裝使用 [insar-arm](https://github.com/chris20011026/insar-arm) 的固定套件，放在工作台專用資料夾；既有 Conda 環境與研究專案保持原設定。
 
 **已有科學環境／從原始碼啟動**：
 

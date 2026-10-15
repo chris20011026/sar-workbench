@@ -21,6 +21,7 @@
  window.closeLibrary=()=>{panel.hidden=true;$('openLibrary').classList.remove('active');};
  async function recent(){const v=await api('/api/library');$('libRecent').replaceChildren();for(const s of v.scans){const b=node('button',s.root+' · '+s.count+' 份產品');b.classList.add('library-path');action(b,async()=>{busy(true);try{showReport(await api('/api/library?scan='+s.id));}finally{busy(false);}});$('libRecent').append(b);}if(!v.scans.length)$('libRecent').textContent='還沒有掃描紀錄。';}
  window.openLibrary=async()=>{
+  window.leaveWorkspace?.('openLibrary');
   window.closeMissions?.();current=null;panel.hidden=false;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=true;$('crumb').textContent='資料與成果瀏覽';$('newProject').classList.remove('active');$('openWelcome').classList.remove('active');$('openLibrary').classList.add('active');
   const data=await api('/api/state'),old=$('libEnv').value;$('libEnv').replaceChildren();for(const e of data.defaults.environments){const o=node('option',e.name+' · '+e.path);o.value=e.path;$('libEnv').append(o);}if([...$('libEnv').options].some(o=>o.value===(old||data.defaults.env)))$('libEnv').value=old||data.defaults.env;
   await recent();if(map)setTimeout(()=>map.invalidateSize(),0);

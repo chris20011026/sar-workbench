@@ -31,6 +31,8 @@ from .core import atomic_json
 from .preflight import check_project, require_preflight
 from .recovery import Recovery
 from .confirmation import Confirmations, saved_review, verify_saved_inputs
+from .workspace import overview, workflow_catalogue, identify
+from .environment_checks import EnvironmentChecks
 
 STATIC = Path(__file__).parent/'static'
 
@@ -54,6 +56,7 @@ def make_server(engine, port=8765):
     conversion_jobs = manager_type()(engine.home)
     operation_lock = threading.RLock()
     onboarding = Onboarding()
+    environment_checks = EnvironmentChecks(engine.home)
     confirmations = Confirmations()
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
@@ -75,7 +78,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -85,6 +88,10 @@ def make_server(engine, port=8765):
                         data = data.replace(b'__TOKEN__', token.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
+                if u.path == '/api/workspace':
+                    return self.send(dict(overview(engine,analyses,nisar_jobs,conversion_jobs,onboarding), workflows=workflow_catalogue()))
+                if u.path == '/api/environment-status':
+                    return self.send(dict(environments=environment_checks.catalogue(defaults()['environments'], ready_environment()), managed=onboarding.runtime.status()))
                 if u.path == '/api/nisar': return self.send(nisar_jobs.get(q['job'][0]) if 'job' in q else dict(jobs=nisar_jobs.listing(), fields=NISAR_FIELDS, version=NISAR_VERSION, busy=bool(nisar_jobs.active)))
                 if u.path == '/api/alos4-conversion': return self.send(conversion_jobs.get(q['job'][0]) if 'job' in q else dict(jobs=conversion_jobs.listing(), busy=bool(conversion_jobs.active)))
                 if u.path == '/api/library': return self.send(library.get(q['scan'][0]) if 'scan' in q else {'scans':library.listing()})
@@ -147,7 +154,7 @@ def make_server(engine, port=8765):
             # Serialize launch decisions across ISCE2, ISCE3 and environment setup.
             launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert',
                         '/api/demo-start', '/api/terrain-start', '/api/import-start',
-                        '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run')
+                        '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check')
             if self.path in launches:
                 with operation_lock: self.handle_post()
             else: self.handle_post()  # Native picker and previews must never block Stop.
@@ -157,6 +164,12 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/workspace-identify':
+                    return self.send(identify(d['path'],d.get('environment') or defaults()['env'],library,onboarding))
+                if self.path == '/api/environment-check':
+                    if engine.active or nisar_jobs.active or conversion_jobs.active or onboarding.runtime.status().get('status')=='running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請等目前的運算或安裝工作結束，再驗證環境。')
+                    return self.send(environment_checks.run(d['path'], defaults()['environments']))
                 if (nisar_jobs.active or conversion_jobs.active) and self.path in ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/demo-start', '/api/terrain-start', '/api/import-start'):
                     raise ValueError('請先完成或停止實驗室中的工作。')
                 if self.path in ('/api/nisar-create', '/api/nisar-run'):

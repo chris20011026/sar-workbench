@@ -1,14 +1,16 @@
 // First-use guidance. All science runs use the pinned private runtime.
 (()=>{
  let first=true,runtime={},plan=null,imported=null,dem=null,wbd=null,lesson=null,jobBusy=false,polling=false,terrainBounds=null,jobsSignature='';
- const names={not_installed:'尚未安裝',running:'進行中',ready:'可以使用',failed:'需要處理',interrupted:'上次中斷',cancelled:'已停止'};
- function welcome(){window.closeLibrary?.();window.closeMissions?.();current=null;reviewLoaded=null;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=false;$('crumb').textContent='開始使用';$('openWelcome').classList.add('active');$('newProject').classList.remove('active');clear();updateRuntime();window.scrollTo({top:0,behavior:'smooth'});}
+ const names={not_installed:'專用工具未安裝',running:'進行中',ready:'可以使用',failed:'需要處理',interrupted:'上次中斷',cancelled:'已停止'};
+ function welcome(){window.leaveWorkspace?.('openWelcome');window.loadEnvironmentPanel?.();window.closeLibrary?.();window.closeMissions?.();current=null;reviewLoaded=null;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=false;$('crumb').textContent='工具與環境';$('openWelcome').classList.add('active');$('newProject').classList.remove('active');clear();updateRuntime();window.scrollTo({top:0,behavior:'smooth'});}
  $('openWelcome').onclick=welcome;
- window.onboardingUpdate=data=>{const select=$('importEnvironment'),selected=select.value,signature=JSON.stringify(data.defaults?.environments||[]);if(select.dataset.environments!==signature){select.dataset.environments=signature;select.replaceChildren();const auto=node('option','自動選擇已安裝的環境');auto.value='';select.append(auto);for(const e of (data.defaults?.environments||[]).filter(e=>e.isce!==false)){const o=node('option',e.name+' · '+e.path);o.value=e.path;select.append(o);}if([...select.options].some(o=>o.value===selected))select.value=selected;}if(first){first=false;if(!data.projects.length)welcome();}};
+ window.onboardingUpdate=data=>{window.detectedEnvironments=data.defaults?.environments||[];const select=$('importEnvironment'),selected=select.value,signature=JSON.stringify(data.defaults?.environments||[]);if(select.dataset.environments!==signature){select.dataset.environments=signature;select.replaceChildren();const auto=node('option','自動選擇已安裝的環境');auto.value='';select.append(auto);for(const e of (data.defaults?.environments||[]).filter(e=>e.isce!==false)){const o=node('option',e.name+' · '+e.path);o.value=e.path;select.append(o);}if([...select.options].some(o=>o.value===selected))select.value=selected;}if(first){first=false;if(!window.workspaceReady&&!data.projects.length)welcome();}};
  function showPanel(id){$(id).hidden=false;$(id).scrollIntoView({behavior:'smooth',block:'start'});}
  $('openLesson').onclick=()=>showPanel('lessonPanel');
  $('openImport').onclick=()=>showPanel('importPanel');
- $('openExpert').onclick=newView;
+ $('openExpert').onclick=()=>window.openWorkspaceCreate?window.openWorkspaceCreate():newView();
+ window.openPreparation=async(id)=>{welcome();const job=await api('/api/onboarding-job?job='+encodeURIComponent(id));showPanel(job.kind==='demo'?'lessonPanel':'importPanel');if(job.kind==='terrain')$('guidedTerrain').hidden=false;await watchJob(job,{import:'importStatus',demo:'lessonStatus',terrain:'terrainStatus'}[job.kind],{import:importResult,demo:lessonResult,terrain:terrainResult}[job.kind]);};
+ window.openAlosImport=(path='')=>{welcome();showPanel('importPanel');if(path){$('importSource').value=path;resetPlan();}};
  function controls(){
   const busy=runtime.status==='running',ready=runtime.status==='ready';
   $('runtimeBadge').textContent=names[runtime.status]||'檢查中';
@@ -21,7 +23,8 @@
   $('runtimePlatform').textContent=`${runtime.platform||''} · 可用空間 ${runtime.free_gb??'—'} GB`;
   $('runtimeHome').textContent='工具存放位置：'+(runtime.home||'')+(runtime.environment?'\n科學環境：'+runtime.environment:'');
   $('runtimeStage').textContent=runtime.stage||'正在檢查';
-  if(!runtime.bootstrap_ready&&!ready)$('runtimeStage').textContent='第一次安裝請使用 Mac 啟動器；已有 ISCE2 環境也可直接建立專案。';
+  if(!runtime.bootstrap_ready&&!ready)$('runtimeStage').textContent=(window.detectedEnvironments||[]).some(e=>e.isce||e.isce3)?'已找到既有科學環境，可在建立專案時使用。下方安裝選項僅供額外的工作台專用工具。':'尚未找到可辨識的科學環境。可使用 Mac 啟動器安裝，或重新偵測既有環境。';
+  $('runLesson').title=ready?'':'合成教學目前需要工作台專用工具通過安裝驗證';
   $('runtimeError').hidden=!runtime.error;$('runtimeError').textContent=runtime.error||'';
   $('runtimeOutput').textContent=runtime.output||'尚未開始安裝。';
   $('runtimeChecks').replaceChildren();for(const c of runtime.checks||[])$('runtimeChecks').append(node('span',`${c.status==='PASS'?'✓':'!'} ${c.name}`,'chip'));

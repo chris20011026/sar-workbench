@@ -188,5 +188,23 @@ class MissionAPI(unittest.TestCase):
             self.assertEqual(e.exception.code,403)
         self.assertFalse((self.base/'state/nisar').exists())
 
+    def test_workspace_endpoints_auth_and_environment_busy_guard(self):
+        import urllib.error
+        r=self.request('/api/workspace')
+        self.assertEqual(r['records'],[])
+        self.assertEqual(len(r['workflows']),8)
+        self.assertIn('environments',self.request('/api/environment-status'))
+        for path in ('/api/workspace','/api/environment-status'):
+            with self.assertRaises(urllib.error.HTTPError) as e:self.request(path,headers={'X-Token':''})
+            self.assertEqual(e.exception.code,403)
+        for path in ('/api/workspace-identify','/api/environment-check'):
+            with self.assertRaises(urllib.error.HTTPError) as e:self.request(path,{},headers={'Origin':'https://example.org'})
+            self.assertEqual(e.exception.code,403)
+        self.engine.active='isce2'
+        with patch('alosstack_helper.server.EnvironmentChecks.run') as check:
+            with self.assertRaises(urllib.error.HTTPError):self.request('/api/environment-check',dict(path='/env'))
+            check.assert_not_called()
+        self.engine.active=None
+
 
 if __name__=='__main__':unittest.main()
