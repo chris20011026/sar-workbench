@@ -154,10 +154,19 @@ class TransferTests(unittest.TestCase):
 
     def test_processing_and_analysis_workers_block_planning(self):
         self.state['status']='ready';atomic_json(self.root/'.helper/state.json',self.state)
-        with self.assertRaisesRegex(ValueError,'完成'):self.m.plan(self.key,str(self.target),'copy')
+        self.m.plan(self.key,str(self.target),'copy');s=self.wait();self.assertEqual(s['status'],'failed');self.assertIn('完成',s['error'])
         self.state['status']='complete';atomic_json(self.root/'.helper/state.json',self.state)
         atomic_json(self.root/'analyses/aaaaaaaaaaaa/analysis.json',dict(status='running'))
         self.m.plan(self.key,str(self.target),'copy');s=self.wait();self.assertEqual(s['status'],'failed');self.assertIn('MintPy',s['error'])
+
+    def test_preview_and_switch_never_read_remote_paths_on_server_thread(self):
+        with patch.object(self.e,'get',side_effect=AssertionError('server read project')):
+            self.plan()
+        s=self.m.record(self.key);self.m.start(self.key,s['transfer'],'copy',True);s=self.wait()
+        self.assertEqual(s['status'],'ready',s)
+        with patch.object(self.e,'attach_project',side_effect=AssertionError('server stat NAS')),patch.object(self.e,'preview_project',side_effect=AssertionError('server read copy')):
+            self.m.start(self.key,s['transfer'],'switch',True);s=self.wait()
+        self.assertEqual(s['status'],'complete',s)
 
     def test_changed_volume_and_symlink_ancestors_are_rejected(self):
         binding=dict(mount='/Volumes/Data',identity='uuid:expected')

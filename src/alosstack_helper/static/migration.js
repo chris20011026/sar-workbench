@@ -12,7 +12,7 @@
  <p class="notice">搬移後可查看既有成果。ISCE2 指令、檢查點與運算設定保留原樣，暫不支援在新位置接續科學運算；請保留原專案與外部資料。</p>
  <p id="migrationSpaceWarning" class="notice" hidden></p><p id="migrationResumeHint" class="hint" hidden>接續時會重新核對已完成檔案；中斷時正在複製的單一檔案會重新複製。完整內容驗證需要讀取兩邊資料，可能花較長時間。</p>
  <label id="migrationConsentRow" class="check"><input id="migrationConsent" type="checkbox"><span id="migrationConsentText">我已確認目的位置與外部資料仍需保留</span></label>
- <div class="migration-actions"><button id="migrationCopy" class="primary" hidden>開始複製並驗證</button><button id="migrationSwitch" class="primary" hidden>再次驗證並切換位置</button><button id="migrationPause" hidden>暫停搬移</button><button id="migrationChange" hidden>更換目的位置</button><button id="migrationDone" hidden>返回工作空間</button></div>
+ <div class="migration-actions"><button id="migrationCopy" class="primary" hidden>開始複製並驗證</button><button id="migrationSwitch" class="primary" hidden>再次驗證並切換位置</button><button id="migrationPause" hidden>暫停搬移</button><button id="migrationReplan" hidden>重新預覽</button><button id="migrationChange" hidden>更換目的位置</button><button id="migrationDone" hidden>返回工作空間</button></div>
  <details id="migrationAbandonPanel"><summary>結束這次搬移紀錄</summary><p>原專案與已建立的副本都會保留。未完成的副本不能直接加入工作台；結束後如需重做，請選擇另一個新資料夾。</p><label class="check"><input id="migrationAbandonConsent" type="checkbox">保留所有檔案，結束這次紀錄</label><button id="migrationAbandon" disabled>結束紀錄</button></details></section>
  <p class="hint">關閉視窗仍會繼續工作；關閉工作台會暫停。下次從「管理專案 → 安全搬移」接續。</p>`;
  document.body.append(dialog);
@@ -49,7 +49,7 @@
   $('migrationSwitch').hidden=phase!=='ready';$('migrationPause').hidden=!active.has(phase);$('migrationDone').hidden=phase!=='complete';
   $('migrationConsentRow').hidden=$('migrationCopy').hidden&&$('migrationSwitch').hidden;
   $('migrationConsentText').textContent=phase==='ready'?'我確認切換到已驗證的新位置，並保留原專案與外部資料':'我已確認目的位置與外部資料仍需保留';
-  $('migrationChange').hidden=active.has(phase)||!!r.destination_identity;$('migrationAbandonPanel').hidden=active.has(phase)||!r.destination_identity;controls();
+  $('migrationReplan').hidden=!(r.mode==='plan'&&['paused','failed'].includes(phase));$('migrationPause').textContent=phase==='planning'?'停止預覽':'暫停搬移';$('migrationChange').hidden=active.has(phase)||!!r.destination_identity;$('migrationAbandonPanel').hidden=active.has(phase)||!r.destination_identity;controls();
  }
  function controls(){
   $('migrationCopy').disabled=!$('migrationConsent').checked;
@@ -65,6 +65,7 @@
  run('migrationPlan',async()=>{const d=await api('/api/migration-plan',{id:key,parent:$('migrationParent').value,name:$('migrationName').value});return d;});
  for(const [id,mode] of [['migrationCopy','copy'],['migrationSwitch','switch']])run(id,async()=>{const d=await api('/api/migration-'+mode,{id:key,transfer:record.transfer,consent:$('migrationConsent').checked});return d;});
  run('migrationPause',async()=>{const d=await api('/api/migration-stop',{id:key});return d;});
+ run('migrationReplan',()=>{const split=record.destination.lastIndexOf('/');return api('/api/migration-plan',{id:key,parent:record.destination.slice(0,split)||'/',name:record.destination.slice(split+1)});});
  run('migrationChange',()=>api('/api/migration-abandon',{id:key,transfer:record.transfer}));
  run('migrationAbandon',async()=>{if(!$('migrationAbandonConsent').checked)return;const d=await api('/api/migration-abandon',{id:key,transfer:record.transfer});return d;});
  run('migrationDone',async()=>{dialog.close();await window.openWorkspaceOverview();await window.refreshWorkspaceRegistry?.();});

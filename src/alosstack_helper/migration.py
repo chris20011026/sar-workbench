@@ -22,7 +22,7 @@ import uuid
 
 from .core import atomic_json
 from .recovery import process_alive
-from .storage import absolute, INPUT_PATHS, WORKFLOWS, mounted_volumes, read_project
+from .storage import absolute, INPUT_PATHS, WORKFLOWS, ProjectStorage, mounted_volumes, read_project
 
 ACTIVE = {'planning', 'copying', 'verifying', 'switch_check'}
 MARKER = '.sar-transfer.json'
@@ -143,6 +143,19 @@ class Transfer:
         completed(self.root, self.s['id'])
 
     def plan(self):
+        # Path resolution/stat can block on an offline NAS. Do it only in this
+        # cancellable child, never while the server holds its manager lock.
+        check_volume(self.s.get('source_binding'))
+        self.root = self.root.resolve(strict=True)
+        self.dest = self.dest.parent.resolve(strict=True)/self.dest.name
+        home = self.folder.parents[1].resolve()
+        if self.dest.is_relative_to(self.root) or self.root.is_relative_to(self.dest) or self.dest.is_relative_to(home):
+            raise ValueError('新舊資料夾不能重疊，也不能放進工作台紀錄目錄。')
+        storage = ProjectStorage(home)
+        with directory(self.root) as fd: self.s['source_identity'] = identity(os.fstat(fd))
+        with directory(self.dest.parent) as fd: self.s['parent_identity'] = identity(os.fstat(fd))
+        self.publish(True,source=str(self.root),destination=str(self.dest),
+                     source_binding=storage.binding(self.root),destination_binding=storage.binding(self.dest.parent))
         self.check(); require_finished_copy(self.root)
         with directory(self.dest.parent) as fd:
             try: os.stat(self.dest.name, dir_fd=fd, follow_symlinks=False)
@@ -371,10 +384,9 @@ class Migrations:
         try:
             if s['status']=='switch_ready':
                 if self.engine.projects[key] != s['registered_source']: raise ValueError('專案登記位置已改變，未切換。')
-                check_volume(s.get('source_binding')); check_volume(s.get('destination_binding'))
-                with directory(Path(s['destination'])) as fd:
-                    if not same_folder(os.fstat(fd),s['destination_identity'],s.get('destination_binding')): raise ValueError('副本已被替換，未切換。')
-                self.engine.attach_project(s['destination'],key)
+                # The child just re-hashed both trees after explicit consent.
+                # Only local bookkeeping remains; never stat a NAS in this lock.
+                self.engine.register_verified_copy(key,s['registered_source'],s['destination'],s.get('destination_binding'))
                 s.update(status='complete',current='',finished=time.time())
             elif s['status'] in ACTIVE:
                 s.update(status='paused',error='搬移程序中斷；已完成的檔案會在接續時重新核對。')
@@ -440,18 +452,16 @@ class Migrations:
             if not isinstance(parent,str) or not parent.strip() or not Path(parent).expanduser().is_absolute(): raise ValueError('請先選擇目的資料夾。')
             name=str(name).strip()
             if not name or name in ('.','..',MARKER) or len(name)>160 or any(c in name for c in '/\\\x00') or any(ord(c)<32 for c in name): raise ValueError('請輸入有效的新資料夾名稱。')
-            state=self.engine.get(key)
-            if state['status']!='complete': raise ValueError('請先完成專案運算。')
-            root=Path(state['config']['root']).resolve(strict=True);parent=absolute(parent).resolve(strict=True);dest=parent/name
+            incident=self.engine.home/'interrupted-projects'/(key+'.json')
+            if incident.exists():raise ValueError('請先檢查這個專案的儲存中斷紀錄。')
+            root=absolute(self.engine.projects[key]);parent=absolute(parent);dest=parent/name
             if dest.is_relative_to(root) or root.is_relative_to(dest) or dest.is_relative_to(self.engine.home.resolve()): raise ValueError('新舊資料夾不能重疊，也不能放進工作台紀錄目錄。')
-            with directory(root) as fd: source_identity=identity(os.fstat(fd))
-            with directory(parent) as fd: parent_identity=identity(os.fstat(fd))
             folder=self.folder/key;folder.mkdir(exist_ok=True)
             if previous:
                 self.archive(key,previous)
             s=dict(id=key,transfer=uuid.uuid4().hex,source=str(root),registered_source=self.engine.projects[key],destination=str(dest),
-                   source_identity=source_identity,parent_identity=parent_identity,source_binding=self.engine.storage.binding(root),
-                   destination_binding=self.engine.storage.binding(parent),status='planning',mode='plan',created=time.time(),files=0,bytes=0,
+                   source_binding=self.engine.storage.entry(key).get('root_binding'),
+                   destination_binding=None,status='planning',mode='plan',created=time.time(),files=0,bytes=0,
                    copied=0,verified=0,current='',error='')
             atomic_json(folder/'state.json',s)
             return self.launch(key,'plan')

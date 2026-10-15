@@ -69,6 +69,24 @@ class Engine:
                         last_stage=state.get('stage', ''), last_status=state['status'], paths=self.storage.path_report(key, state))
         return info
 
+    def register_verified_copy(self,key,source,destination,binding):
+        """Commit a child-verified transfer locally; no potentially blocking NAS I/O.
+
+        Only Migrations calls this after explicit switch consent and a successful
+        full verification. A drive unplugged immediately afterwards remains a
+        retained offline bookmark, identified by its recorded volume and ID.
+        """
+        with self.lock,self.registry_lock:
+            if self.active or self.projects.get(key)!=source:raise ValueError('專案位置或運算狀態已變更，未切換。')
+            if any(k!=key and absolute(p)==absolute(destination) for k,p in self.projects.items()):raise ValueError('目的位置已登記為另一個專案。')
+            entry=self.storage.entry(key)
+            entry['root_binding']={**binding,'relative':str(absolute(destination).relative_to(absolute(binding['mount'])))} if binding else None
+            # Both files are local. Research state, commands and checkpoints are
+            # never rewritten, including when the destination is now offline.
+            self.storage._store(key,entry)
+            projects={**self.projects,key:destination}
+            atomic_json(self.registry,projects);self.projects=projects
+
     def edit_project(self, key, name, notes):
         with self.registry_lock:
             if key not in self.projects: raise ValueError('找不到這個專案。')
