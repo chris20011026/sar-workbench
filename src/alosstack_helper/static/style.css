@@ -43,3 +43,20 @@
 #libraryPanel .input-row{flex-wrap:wrap}
 #libraryPanel .input-row input{min-width:180px;flex:1}
 @media(max-width:700px){#libMap{height:360px}#libraryPanel .inline{flex-wrap:wrap}}
+
+/* Mission workflows keep long scientific paths readable on small screens. */
+.mission-tabs{display:flex;gap:12px;margin:26px 0;flex-wrap:wrap}
+.mission-tabs [aria-selected="true"]{background:var(--ink,#173e34);color:white}
+#missionsPanel .input-row{display:flex;gap:10px;align-items:center}
+#missionsPanel .input-row input{min-width:0;flex:1}
+#missionsPanel .input-row button{flex-shrink:0}
+#missionsPanel label small{display:block;font-weight:normal;line-height:1.6;margin-top:8px}
+#missionsPanel .grid{align-items:start}
+#missionsPanel pre{max-height:350px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
+#missionsPanel [aria-pressed="true"]{outline:2px solid #527b67;outline-offset:2px}
+#missionsPanel .summary{display:grid;grid-template-columns:minmax(130px,1fr) 2fr;gap:10px}
+#missionsPanel .summary dd{overflow-wrap:anywhere}
+.mission-table{overflow:auto;margin:20px 0}
+.mission-table table{width:100%;border-collapse:collapse;white-space:nowrap}
+.mission-table th,.mission-table td{text-align:left;padding:10px;border-bottom:1px solid #dce4db}
+@media(max-width:600px){#missionsPanel .input-row{flex-wrap:wrap}#missionsPanel .input-row input{flex-basis:100%}#missionsPanel .summary{grid-template-columns:1fr}#missionsPanel .summary dd{margin:0 0 10px}}

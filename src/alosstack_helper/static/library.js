@@ -20,11 +20,12 @@
  function clearPreview(){epoch++;pointSeq++;shown=null;bounds=null;$('libFit').disabled=true;if(marker){marker.remove();marker=null;}if(overlay){overlay.remove();overlay=null;}if(url){URL.revokeObjectURL(url);url=null;}$('libScale').style.background='';$('libLegend').textContent='';$('libPoint').textContent='請載入目前選取的圖層。';}
  window.closeLibrary=()=>{panel.hidden=true;$('openLibrary').classList.remove('active');};
  async function recent(){const v=await api('/api/library');$('libRecent').replaceChildren();for(const s of v.scans){const b=node('button',s.root+' · '+s.count+' 份產品');b.classList.add('library-path');action(b,async()=>{busy(true);try{showReport(await api('/api/library?scan='+s.id));}finally{busy(false);}});$('libRecent').append(b);}if(!v.scans.length)$('libRecent').textContent='還沒有掃描紀錄。';}
- action($('openLibrary'),async()=>{
-  current=null;panel.hidden=false;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=true;$('crumb').textContent='資料與成果瀏覽';$('newProject').classList.remove('active');$('openWelcome').classList.remove('active');$('openLibrary').classList.add('active');
+ window.openLibrary=async()=>{
+  window.closeMissions?.();current=null;panel.hidden=false;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=true;$('crumb').textContent='資料與成果瀏覽';$('newProject').classList.remove('active');$('openWelcome').classList.remove('active');$('openLibrary').classList.add('active');
   const data=await api('/api/state'),old=$('libEnv').value;$('libEnv').replaceChildren();for(const e of data.defaults.environments){const o=node('option',e.name+' · '+e.path);o.value=e.path;$('libEnv').append(o);}if([...$('libEnv').options].some(o=>o.value===(old||data.defaults.env)))$('libEnv').value=old||data.defaults.env;
   await recent();if(map)setTimeout(()=>map.invalidateSize(),0);
- });
+ };
+ action($('openLibrary'),()=>window.openLibrary());
  action($('libFolder'),()=>choosePath('dir',p=>{$('libPath').value=p;},$('libPath').value||defaults.home));
  action($('libFile'),()=>choosePath('file',p=>{$('libPath').value=p;},$('libPath').value||defaults.home));
  action($('libScan'),async()=>{
@@ -44,12 +45,22 @@
    row.append(node('p',p.type==='CEOS'?`${p.images} 份 IMG · ${(p.polarizations||[]).join('／')} · 取樣率 ${m.range_sampling_mhz??'未確認'} MHz`:`軌道 ${m.trackNumber??'未確認'} · 影格 ${m.frameNumber??'未確認'} · ${m.orbitPassDirection||'未確認'} · `+Object.entries(m.polarizations||{}).map(([f,ps])=>f+': '+ps.join('/')).join('；'),'hint'));
    for(const w of p.warnings||[])row.append(node('p',w,'hint'));
    if(p.type==='GUNW'&&p.layers.length){const b=node('button','查看成果地圖','primary');action(b,()=>openProduct(i));row.append(b);}
-   else row.append(node('span',p.type==='RSLC'?'可作為未來 ISCE3 流程的輸入；目前僅辨識':p.sensor==='ALOS-4'?'跨衛星處理待驗證':'若要處理，請另建立 ALOS 專案並完成既有健檢','badge'));
+   else row.append(node('span',p.type==='RSLC'?'可在 NISAR 實驗室建立雙日期工作':p.sensor==='ALOS-4'?'跨衛星處理待驗證':'若要處理，請另建立 ALOS 專案並完成既有健檢','badge'));
    card.append(row);
   }
-  for(const pair of v.nisar_pairs||[]){const d=node('div',undefined,'notice');d.append(node('strong','NISAR 配對初步檢查'),node('p',pair.products.map(i=>v.products[i].metadata.zeroDopplerStartTime||'日期未知').join(' ↔ ')));d.append(node('p',pair.issues.length?pair.issues.join('；'):'軌道、影格、升降軌一致；共同頻段／極化：'+Object.entries(pair.common).map(([f,p])=>f+': '+p.join('/')).join('；')),node('p',pair.note,'hint'));card.append(d);}for(const e of v.errors)warning(card,e.path+'：'+e.message);box.append(card);
+  for(const pair of v.nisar_pairs||[]){
+   const d=node('div',undefined,'notice');d.append(node('strong','NISAR 配對初步檢查'),node('p',pair.products.map(i=>v.products[i].metadata.zeroDopplerStartTime||'日期未知').join(' ↔ ')));
+   d.append(node('p',pair.issues.length?pair.issues.join('；'):'軌道、影格、升降軌一致；共同頻段／極化：'+Object.entries(pair.common).map(([f,p])=>f+': '+p.join('/')).join('；')),node('p',pair.note,'hint'));
+   if(!pair.issues.length){
+    const button=node('button','帶入 NISAR 雙日期設定');
+    action(button,()=>{const products=pair.products.map(i=>v.products[i]).sort((a,b)=>a.metadata.zeroDopplerStartTime.localeCompare(b.metadata.zeroDopplerStartTime));return window.openNisar({reference:products[0].path,secondary:products[1].path});});
+    d.append(button);
+   }
+   card.append(d);
+  }for(const e of v.errors)warning(card,e.path+'：'+e.message);box.append(card);
   if(v.configs.length){const c=node('div',undefined,'card');c.append(node('h2','設定檔檢查'),node('p','僅列出問題，不會改寫 XML／YAML 或執行課程腳本。','hint'));for(const cfg of v.configs){const d=node('details');d.append(node('summary',cfg.path));for(const w of cfg.warnings)warning(d,w);if(!cfg.warnings.length)d.append(node('p','未發現本版檢查涵蓋的路徑或格式問題；不代表參數已通過完整科學驗證。','hint'));const pre=node('pre',JSON.stringify(cfg.properties,null,2));d.append(pre);c.append(d);}box.append(c);}
  }
+ window.viewNisarProduct=async path=>{await window.openLibrary();$('libPath').value=path;showReport(await api('/api/library-scan',{path,environment:$('libEnv').value}));const i=report.products.findIndex(p=>p.type==='GUNW');if(i>=0)openProduct(i);};
  function openProduct(i){clearPreview();productIndex=i;$('libViewer').hidden=false;const p=report.products[i];$('libSource').textContent=p.path;$('libLayer').replaceChildren();for(const l of p.layers){const o=node('option',l.label);o.value=l.key;$('libLayer').append(o);}$('libThreshold').value='0';$('libMapStatus').textContent='選擇圖層後按「載入圖層」。';$('libViewer').scrollIntoView({behavior:'smooth'});if(map)map.invalidateSize();}
  function request(){return {scan:report.id,product:productIndex,layer:$('libLayer').value,threshold:Number($('libThreshold').value)};}
  $('libLayer').onchange=$('libThreshold').oninput=()=>{clearPreview();$('libMapStatus').textContent='設定已改變，請重新載入圖層。';};

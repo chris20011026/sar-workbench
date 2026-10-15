@@ -66,6 +66,14 @@ def alos(path):
     # Separate from existing ALOS-2 importer: this does not certify processing compatibility.
     images=sorted(path.parent.glob('IMG-??-'+path.name[4:]))
     out=dict(sensor='ALOS-4' if path.name.startswith('LED-ALOS4') else 'ALOS-2',type='CEOS',path=str(path),images=len(images),stamp=stamp(path),polarizations=sorted({p.name[4:6] for p in images}),metadata={},warnings=[])
+    provenance = path.parent/'conversion.json'
+    if provenance.is_file() and provenance.stat().st_size < 1024*1024:
+        try:
+            converted = json.loads(provenance.read_text())
+            if converted.get('source_sensor') == 'ALOS-4' and converted.get('output_format') == 'PALSAR-2 CEOS compatibility':
+                out.update(sensor='ALOS-4', converted=True)
+                out['warnings'].append('轉換紀錄顯示來源為 ALOS-4；ALOS2 檔名是相容格式，frame 編號不代表跨衛星對應。')
+        except (OSError, ValueError): pass
     try:
         import isce
         try:

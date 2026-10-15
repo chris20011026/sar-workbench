@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "alosstack-helper"
 version = "0.6.0b6"
-description = "Local visual SAR workbench for ISCE2 alosStack, alos2App and MintPy"
+description = "Local visual SAR workbench for ISCE2, MintPy and experimental NISAR/ALOS-4 workflows"
 requires-python = ">=3.10"
 dependencies = []
 

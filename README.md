@@ -1,5 +1,7 @@
 # SAR 研究工作台（SAR Workbench）
 
+**main 分支新增：[NISAR／ALOS-4 實驗室](docs/MISSION_LAB.md)**。提供 NISAR 雙日期的表單、健檢與執行入口，以及 ALOS-4 格式副本和跨衛星相容性檢查。真實 NISAR 全流程與混合 ALOS 自動接續尚待驗證；既有 Mac 下載包尚未包含這些新增功能。
+
 新增：ALOS-2 正式中繼資料核對、候選分組、影像覆蓋地圖與地形範圍帶入。使用方式與限制見[影像匯入說明](docs/IMAGE_IMPORT.md)。
 
 
@@ -13,6 +15,8 @@
 | Sentinel-1 雙日期 topsApp | 試驗；S1A／S1B IW SLC，未完成真實影像驗證 |
 | Sentinel-1 多日期 topsStack | 規劃中 |
 | Stripmap stripmapApp / stripmapStack | 規劃中 |
+| NISAR 雙日期（ISCE3） | main 實驗功能；獨立環境，未完成真實 RSLC 全流程驗證 |
+| ALOS-4 格式轉換／混合資料健檢 | main 實驗功能；不自動接續跨衛星干涉 |
 
 **第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.6.0-beta.6) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 

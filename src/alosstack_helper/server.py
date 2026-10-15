@@ -12,6 +12,9 @@ import threading
 import fcntl
 
 from .library import Library
+from .nisar_jobs import NisarJobs, FIELDS as NISAR_FIELDS, SUPPORTED_VERSION as NISAR_VERSION
+from .alos_compatibility import compatibility
+from .alos4_conversion import manager_type
 from .core import inspect_data, read_template
 from .engine import Engine
 from .native_picker import choose_native
@@ -41,12 +44,15 @@ def defaults():
     env = next((p for p in candidates if (p/'share/isce2/alosStack/create_cmds.py').is_file()), None)
     return {'home':str(Path.home()), 'env':str(env) if env else '',
             'template':str(env/'share/isce2/alosStack/alosStack.xml') if env else '',
-            'environments':[{'path':str(p),'name':p.name,'isce':(p/'share/isce2/alosStack/create_cmds.py').is_file(),'mintpy':bool(list((p/'conda-meta').glob('mintpy-*.json'))) or any((p/'lib').glob('python*/site-packages/mintpy'))} for p in candidates if (p/'bin/python').is_file()]}
+            'environments':[{'path':str(p),'name':p.name,'isce':(p/'share/isce2/alosStack/create_cmds.py').is_file(),'isce3':any((p/'lib').glob('python*/site-packages/nisar/workflows/insar.py')),'mintpy':bool(list((p/'conda-meta').glob('mintpy-*.json'))) or any((p/'lib').glob('python*/site-packages/mintpy'))} for p in candidates if (p/'bin/python').is_file()]}
 
 def make_server(engine, port=8765):
     token = secrets.token_urlsafe(32)
     analyses = Analyses(engine)
     library = Library(engine.home)
+    nisar_jobs = NisarJobs(engine.home)
+    conversion_jobs = manager_type()(engine.home)
+    operation_lock = threading.RLock()
     onboarding = Onboarding()
     confirmations = Confirmations()
     class Handler(BaseHTTPRequestHandler):
@@ -69,7 +75,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/library.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -79,11 +85,15 @@ def make_server(engine, port=8765):
                         data = data.replace(b'__TOKEN__', token.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
+                if u.path == '/api/nisar': return self.send(nisar_jobs.get(q['job'][0]) if 'job' in q else dict(jobs=nisar_jobs.listing(), fields=NISAR_FIELDS, version=NISAR_VERSION, busy=bool(nisar_jobs.active)))
+                if u.path == '/api/alos4-conversion': return self.send(conversion_jobs.get(q['job'][0]) if 'job' in q else dict(jobs=conversion_jobs.listing(), busy=bool(conversion_jobs.active)))
                 if u.path == '/api/library': return self.send(library.get(q['scan'][0]) if 'scan' in q else {'scans':library.listing()})
                 if u.path == '/api/library-image': return self.send(library.artifact(q['preview'][0]).read_bytes(),mime='image/png')
                 if u.path == '/api/onboarding': return self.send(dict(onboarding.runtime.status(), jobs=onboarding.recent()))
                 if u.path == '/api/onboarding-job': return self.send(onboarding.job(q.get('job', [''])[0]))
-                if u.path == '/api/state': return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active)})
+                if u.path == '/api/state':
+                    nisar_jobs.reconcile(); conversion_jobs.reconcile()
+                    return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active or nisar_jobs.active or conversion_jobs.active)})
                 if u.path == '/api/tops-schema':return self.send({'fields':TOPS_FIELDS})
                 if u.path == '/api/pair-schema':return self.send({'fields':FIELDS})
                 if u.path == '/api/mintpy-schema':return self.send(catalogue(q.get('environment',[None])[0] or None))
@@ -134,14 +144,35 @@ def make_server(engine, port=8765):
                 return self.send({'error':'Not found'},404)
             except Exception as e: self.send({'error':str(e)},400)
         def do_POST(self):
+            # Serialize launch decisions across ISCE2, ISCE3 and environment setup.
+            launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert',
+                        '/api/demo-start', '/api/terrain-start', '/api/import-start',
+                        '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run')
+            if self.path in launches:
+                with operation_lock: self.handle_post()
+            else: self.handle_post()  # Native picker and previews must never block Stop.
+        def handle_post(self):
             if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
             try:
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if (nisar_jobs.active or conversion_jobs.active) and self.path in ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/demo-start', '/api/terrain-start', '/api/import-start'):
+                    raise ValueError('請先完成或停止實驗室中的工作。')
+                if self.path in ('/api/nisar-create', '/api/nisar-run'):
+                    if engine.active or conversion_jobs.active or onboarding.runtime.status().get('status') == 'running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先完成其他運算或安裝工作。')
+                    return self.send(nisar_jobs.create(d) if self.path.endswith('create') else nisar_jobs.start(d['id'], d.get('reviewed')))
+                if self.path == '/api/nisar-stop': nisar_jobs.stop(); return self.send({'ok':True})
+                if self.path in ('/api/alos4-conversion-create', '/api/alos4-conversion-run'):
+                    if engine.active or nisar_jobs.active or onboarding.runtime.status().get('status') == 'running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先完成其他運算或安裝。')
+                    return self.send(conversion_jobs.create(d) if self.path.endswith('create') else conversion_jobs.start(d['id'], d.get('reviewed')))
+                if self.path == '/api/alos4-conversion-stop': conversion_jobs.stop(); return self.send({'ok':True})
                 if self.path == '/api/library-scan': return self.send(library.scan(d['path'],d.get('environment') or defaults()['env']))
                 if self.path == '/api/library-preview': return self.send(library.preview(d))
                 if self.path == '/api/library-point': return self.send(library.point(d))
+                if self.path == '/api/alos-compatibility': return self.send(compatibility(library.scan(d['path'], d.get('environment') or defaults()['env'])))
                 if self.path == '/api/setup-start':
                     if engine.active: raise ValueError('請等待目前的研究運算結束，再進行安裝或驗證。')
                     if any(j['status']=='running' for j in onboarding.jobs.values()):
@@ -208,6 +239,8 @@ def make_server(engine, port=8765):
             except Exception as e: self.send({'error':str(e)},400)
     server = ThreadingHTTPServer(('127.0.0.1',port),Handler)
     server.onboarding = onboarding
+    server.nisar_jobs = nisar_jobs
+    server.conversion_jobs = conversion_jobs
     return server
 
 def main():
@@ -237,6 +270,8 @@ def main():
         atomic_json(args.desktop_session, {'url':url, 'pid':os.getpid()})
     if not args.no_browser: webbrowser.open(url)
     def shutdown(*_):
+        server.nisar_jobs.stop(shutdown=True)
+        server.conversion_jobs.stop(shutdown=True)
         server.onboarding.runtime.stop()
         server.onboarding.stop()
         if engine.active: engine.stop()
@@ -245,6 +280,8 @@ def main():
     try: server.serve_forever()
     except KeyboardInterrupt: pass
     finally:
+        server.nisar_jobs.stop(shutdown=True)
+        server.conversion_jobs.stop(shutdown=True)
         server.onboarding.runtime.stop()
         server.onboarding.stop()
         if engine.active: engine.stop()

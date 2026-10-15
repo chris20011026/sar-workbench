@@ -2,7 +2,7 @@
 (()=>{
  let first=true,runtime={},plan=null,imported=null,dem=null,wbd=null,lesson=null,jobBusy=false,polling=false,terrainBounds=null,jobsSignature='';
  const names={not_installed:'尚未安裝',running:'進行中',ready:'可以使用',failed:'需要處理',interrupted:'上次中斷',cancelled:'已停止'};
- function welcome(){window.closeLibrary?.();current=null;reviewLoaded=null;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=false;$('crumb').textContent='開始使用';$('openWelcome').classList.add('active');$('newProject').classList.remove('active');clear();updateRuntime();window.scrollTo({top:0,behavior:'smooth'});}
+ function welcome(){window.closeLibrary?.();window.closeMissions?.();current=null;reviewLoaded=null;$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=false;$('crumb').textContent='開始使用';$('openWelcome').classList.add('active');$('newProject').classList.remove('active');clear();updateRuntime();window.scrollTo({top:0,behavior:'smooth'});}
  $('openWelcome').onclick=welcome;
  window.onboardingUpdate=data=>{const select=$('importEnvironment'),selected=select.value,signature=JSON.stringify(data.defaults?.environments||[]);if(select.dataset.environments!==signature){select.dataset.environments=signature;select.replaceChildren();const auto=node('option','自動選擇已安裝的環境');auto.value='';select.append(auto);for(const e of (data.defaults?.environments||[]).filter(e=>e.isce!==false)){const o=node('option',e.name+' · '+e.path);o.value=e.path;select.append(o);}if([...select.options].some(o=>o.value===selected))select.value=selected;}if(first){first=false;if(!data.projects.length)welcome();}};
  function showPanel(id){$(id).hidden=false;$(id).scrollIntoView({behavior:'smooth',block:'start'});}
