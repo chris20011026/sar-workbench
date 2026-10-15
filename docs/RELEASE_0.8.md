@@ -1,0 +1,38 @@
+# SAR Workbench 0.8.0 beta 1
+
+此版把已完成的 SAR 處理成果接入比較與研究報告，並提供手動 alosStack 成果匯入及 Sentinel-1 真實影像評閱紀錄。新增工具讀取既有結果，衍生成果另存；不因比較或產生報告重新執行 ISCE2／MintPy。
+
+## 新增功能
+
+| 功能 | 可以做什麼 | 使用條件與限制 |
+| --- | --- | --- |
+| [MintPy 成果比較](COMPARISON.md) | 同專案兩個完成分析的並排地圖、同步觀看範圍、設定與品質統計、原生點位曲線及 CSV | 差值需核對完整原生格網、資料來源、參考基準、單位、LOS 幾何、時間模型與實際日期；不相容時保持並列，不強行相減 |
+| [研究報告](RESEARCH_REPORTS.md) | 可編輯 Word、自含 HTML、JSON 設定與來源快照、圖片與完整報告 ZIP；可附比較與點位曲線 | 至少一個完成的 MintPy 分析；研究結論由研究者填寫。預設縮減本機絕對路徑 |
+| [匯入手動 ISCE2 成果](LEGACY_IMPORT.md) | 預覽標準 alosStack 目錄後建立獨立工作資料夾，接續品質檢查與 MintPy | 僅支援完整標準 alosStack、單一 looks 與連通配對網路；不接管原始流程，不推測電離層歷史，不讀取來源 pickle 或執行來源腳本 |
+| [Sentinel-1 驗證紀錄](SENTINEL_VALIDATION.md) | 整理 TOPS 處理證據、ESD／距離向估計紀錄、人工品質評閱、獨立原生執行比較及 HTML／JSON 匯出 | 這是驗證紀錄工具；沒有真實兩期 IW SLC 就不能完成真實科學驗證。填完評閱不會開放 topsStack |
+
+比較與報告會保留實際選定的最終時間序列；校正後成果遺失時停止，不改用未校正檔案。來源變更、取消、中斷或半成品不能冒充完成成果。地圖是顯示預覽，統計與點位讀取原生資料；兩種設定的差值不等於真實誤差或準確率。
+
+匯入手動成果後，大型影像仍位於外部來源，工作資料夾保留引用。請保持原磁碟連線與來源不變；只備份新工作資料夾並不足以保存整份研究。兩日期可匯入做品質檢查，MintPy 介面至少需要三日期。
+
+## 安裝與更新
+
+版本標籤為 `v0.8.0-beta.1`，Mac 下載包為 `SAR-Workbench-0.8.0-beta.1-macOS-arm64.zip`。需要 Apple Silicon 與 macOS 14.5 以上。首次啟動可準備工作台專用工具，無須預先安裝 Python 或 Conda；操作見[第一次使用](FIRST_USE.md)。
+
+已有 App 的使用者應先完成或停止背景工作，再結束舊 App 並更換新版。沿用原工具與狀態目錄，即可保留環境及專案登記。這次新增的是工作台功能，沒有變更科學套件鎖定清單，也不要求為新介面重裝環境。
+
+本版仍採 ad-hoc 簽署，未經 Apple Developer ID 簽署與公證。由正式 Release 下載並核對其 SHA256；不需關閉整台電腦的 Gatekeeper。ISCE3／NISAR 保持獨立實驗環境，不混入 ISCE2 環境。
+
+## 驗證狀態
+
+本機原生 ARM 科學環境的 408 項測試全部通過，沒有跳過；另外通過兩組瀏覽器狀態測試、全部前端腳本語法檢查，以及桌面／窄螢幕操作檢查。11 頁 Word 範例已實際渲染並逐頁檢查。測試涵蓋來源唯讀、匯入結構與變動檢查、禁止匯入專案重跑原始階段、比較相容性與原生數值、報告輸出與來源追溯，以及過期評閱、取消和存取限制。標準 alosStack 合成資料亦經已安裝的 ISCE2 中繼資料載入及 MintPy `load_data`／`modify_network` 驗證，確認來源檔案未變更。
+
+GitHub Actions 使用乾淨的 ARM Mac 建置 App、啟動專用 Miniforge、安裝固定科學環境、執行環境檢查與合成資料驗證，再測試包內伺服器。Release 附件只使用同一發布 commit 成功驗證的建置產物；實際結果與 Actions 連結見 [Release](https://github.com/chris20011026/sar-workbench/releases/tag/v0.8.0-beta.1) 與 [Workbench validation](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)。本機通過不代替這項發布關卡。
+
+上述測試驗證軟體行為與合成數值，不是所有研究資料的科學品質保證。目前仍未完成：
+
+- 相容的真實 Sentinel-1 IW SLC 雙日期端到端及獨立原生結果對照；TOPS 維持試驗狀態，**topsStack 尚未開放**。
+- 真實使用者手動 alosStack 專案匯入後的獨立科學驗證；只有完整標準佈局可進入此匯入器。
+- 真實 NISAR RSLC 全流程與混合 ALOS 跨衛星干涉驗證。
+
+單軌位移與速度仍是相對參考點／日期的 LOS 觀測，不應自動解讀為垂直下陷。正式研究需保留相干性、解纏、參考基準、校正及獨立資料的判讀。

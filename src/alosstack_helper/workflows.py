@@ -52,7 +52,7 @@ def raster_size(path):
 
 def inventory(s):
     if s['config'].get('workflow','alosStack')!='alosStack':raise ValueError('MintPy 時序目前需使用已完成的 alosStack 多日期專案。')
-    if s['status']!='complete':raise ValueError('請先完成 alosStack，再進行成果檢查與 MintPy。')
+    if s['status']!='complete' and not (s['status']=='imported' and s.get('import_only')):raise ValueError('請先完成 alosStack，再進行成果檢查與 MintPy。')
     p=Path(s['config']['root'])/'proc';ref=s['config']['reference'];pairs=s.get('expected_pairs',[])
     if not pairs:raise ValueError('專案缺少預期配對清單。')
     files=[];rows=[];shape=None;looks=None

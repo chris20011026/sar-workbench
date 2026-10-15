@@ -1,32 +1,30 @@
 # SAR 研究工作台（SAR Workbench）
 
-**0.7 測試版新增：[統一工作空間](docs/WORKSPACE.md)與 [NISAR／ALOS-4 實驗流程](docs/MISSION_LAB.md)**。提供 NISAR 雙日期的表單、健檢與執行入口，以及 ALOS-4 格式副本和跨衛星相容性檢查。真實 NISAR 全流程與混合 ALOS 自動接續尚待驗證；新版 Mac 下載包已納入這些入口；ISCE3 仍需另外準備獨立環境。
+本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.8.0 beta 1**，新增成果比較、研究報告、手動成果匯入與 Sentinel-1 驗證紀錄。
 
-新增：ALOS-2 正式中繼資料核對、候選分組、影像覆蓋地圖與地形範圍帶入。使用方式與限制見[影像匯入說明](docs/IMAGE_IMPORT.md)。
+- **[MintPy 成果比較](docs/COMPARISON.md)**：並排地圖、同步縮放、設定差異、有效範圍統計與原生點位曲線。只有格網、參考基準、單位與時間模型等條件相容，才提供 B − A 差值。
+- **[研究報告](docs/RESEARCH_REPORTS.md)**：由已完成分析產生可編輯 Word、可列印網頁、JSON 設定快照與包含圖片的報告包，可附上比較及選定點位曲線。
+- **[匯入手動 ISCE2 成果](docs/LEGACY_IMPORT.md)**：目前限完整、標準目錄的 alosStack 成果；預覽後建立獨立工作資料夾，原始資料唯讀，可接續品質檢查與 MintPy。不是所有 ISCE2 成果的通用匯入器，也不恢復原本 cmd1–4。
+- **[Sentinel-1 真實影像驗證紀錄](docs/SENTINEL_VALIDATION.md)**：整理處理證據、人工評閱與獨立執行比較紀錄。工具與合成測試已完成，**真實 IW SLC 端到端驗證仍待進行，topsStack 尚未開放**。
 
-本版另提供[外接磁碟與專案管理](docs/WORKSPACE.md#外接硬碟與專案管理)：更名、備註、加入既有工作台專案、離線紀錄保留與磁碟重連。掛載位置改變時核對磁碟及專案代號後引導重新連結；舊科學指令內的絕對路徑仍保留保護，不自動改寫續跑。
+[統一工作空間](docs/WORKSPACE.md)保留影像匯入、外接磁碟重連、[儲存空間統計](docs/STORAGE_USAGE.md)與[安全搬移](docs/PROJECT_MIGRATION.md)。[ALOS-2 影像匯入](docs/IMAGE_IMPORT.md)提供正式中繼資料核對、候選分組、覆蓋地圖與地形範圍帶入。
 
-
-「管理專案 → 儲存空間」可背景統計各類資料占用與磁碟可用空間，支援停止和離線查看上次結果；[計算方式與限制](docs/STORAGE_USAGE.md)。
-
-「管理專案 → 安全搬移」可將已完成專案複製到新位置，逐檔驗證後再確認切換；支援暫停與接續，原專案保留。[搬移範圍與限制](docs/PROJECT_MIGRATION.md)。
-
-本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.7.0 beta 2**。新增 [Sentinel-1 TOPS 雙日期試驗流程](docs/SENTINEL_TOPS.md)：SAFE／ZIP 辨識、選区、精密軌道、共同 burst 檢查與階段執行。尚未完成真實 SLC 端到端驗證。
+[NISAR／ALOS-4 實驗流程](docs/MISSION_LAB.md)仍使用獨立的 ISCE3 環境。真實 NISAR RSLC 全流程與混合 ALOS 自動接續尚待驗證，不替代 ISCE2 的 alosStack。
 
 | 工作流 | 狀態 |
 | --- | --- |
 | ALOS-2 多日期 alosStack | 已實作；含人工電離層檢查點 |
 | ALOS-2 雙日期 alos2App | 試用；同模式 Level 1.1 Stripmap |
-| MintPy 時間序列 | 已實作；接續本工具完成的 alosStack 專案 |
+| MintPy 時間序列 | 已實作；接續工作台完成或通過匯入檢查的標準 alosStack 成果 |
 | Sentinel-1 雙日期 topsApp | 試驗；S1A／S1B IW SLC，未完成真實影像驗證 |
-| Sentinel-1 多日期 topsStack | 規劃中 |
+| Sentinel-1 多日期 topsStack | 規劃中；尚未開放 |
 | Stripmap stripmapApp / stripmapStack | 規劃中 |
 | NISAR 雙日期（ISCE3） | 實驗功能；獨立環境，未完成真實 RSLC 全流程驗證 |
 | ALOS-4 格式轉換／混合資料健檢 | 實驗功能；不自動接續跨衛星干涉 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.7.0-beta.2) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.8.0-beta.1) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
-[第一次使用指南](docs/FIRST_USE.md) · [0.7 更新與驗證方式](docs/RELEASE_0.7.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
+[第一次使用指南](docs/FIRST_USE.md) · [0.8 更新與驗證狀態](docs/RELEASE_0.8.md) · [0.7 版本紀錄](docs/RELEASE_0.7.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
 「工具與環境」提供合成教學、ALOS-2 ZIP／資料夾匯入與公開地形下載。真實 SAR 影像仍需自行取得，科學參考點與電離層品質仍需判讀。自動安裝使用 [insar-arm](https://github.com/chris20011026/insar-arm) 的固定套件，放在工作台專用資料夾；既有 Conda 環境與研究專案保持原設定。
 
@@ -65,7 +63,7 @@ macOS 上的「選擇」與「匯入 XML 範本」預設開啟系統原生選擇
 
 - macOS / Linux 為目標平台；開發驗證使用 macOS。Windows 原生不支援，可在 WSL 內另行驗證。
 - 可由 Mac App 安裝專用環境，或自行選擇可工作的 Conda ISCE2 環境，內含 `share/isce2/alosStack`，及 `mdx`、ImageMagick `montage` 等上游工具。使用 `conda run` 啟動環境，並為子程序加入該環境的 ISCE_HOME/bin、ISCE_HOME/applications 與 alosStack 搜尋路徑，不修改原環境套件或 shell 設定。
-- 新建專案；不接管既有 `proc` 或覆蓋既有成果。
+- 新建專案；標準 alosStack 手動成果可經預覽匯入獨立工作資料夾，不接管既有 `proc`、重跑來源指令或覆蓋原始成果。
 - 引擎讀取 `YYMMDD/LED-ALOS2...`、`YYMMDD/IMG-...ALOS2...`。0.6 匯入精靈可掃描巢狀資料夾與 ZIP，整理到新的日期目錄。跨軌道自動分組尚未實作；混合產品會要求先分組。
 - 可直接讀取來源，或 rsync 複製到專案並 SHA-256 比對。大型檔案完整驗證需要時間。NAS 需事先掛載。
 - DEM/WBD 需含同名 XML，內容和覆蓋區域由研究者確認。0.6 可取得 Copernicus DSM/WBM 並转換高程與格式，也可選既有地形檔；詳見首次使用指南。準備時會在專案 .helper/inputs 建立原始 raster 的符號連結，複製並修正 XML 的 file_name，以及 VRT 的 SourceFilename，來源 raster/XML/VRT 均不修改。XML 其他內容保留，複雜 VRT 外部來源會停止要求確認。專案仍依賴原始資料位置。

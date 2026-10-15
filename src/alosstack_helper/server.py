@@ -35,6 +35,10 @@ from .workspace import overview, workflow_catalogue, identify
 from .environment_checks import EnvironmentChecks
 from .storage_usage import StorageUsage
 from .migration import Migrations
+from .comparison import Comparisons
+from .reports import Reports
+from .legacy import LegacyImports
+from .tops_validation import TopsValidation
 from . import DISPLAY_VERSION
 
 STATIC = Path(__file__).parent/'static'
@@ -54,6 +58,10 @@ def defaults():
 def make_server(engine, port=8765):
     token = secrets.token_urlsafe(32)
     analyses = Analyses(engine)
+    comparisons = Comparisons(analyses)
+    reports = Reports(analyses, comparisons)
+    legacy = LegacyImports(engine)
+    tops_validation = TopsValidation(engine)
     library = Library(engine.home)
     nisar_jobs = NisarJobs(engine.home)
     conversion_jobs = manager_type()(engine.home)
@@ -68,11 +76,12 @@ def make_server(engine, port=8765):
                         '/api/analysis-rename', '/api/survey', '/api/geo-view', '/api/geo-point',
                         '/api/geo-export', '/api/geo-figure', '/api/setup-start', '/api/demo-start',
                         '/api/terrain-start', '/api/import-start', '/api/nisar-create', '/api/nisar-run',
-                        '/api/alos4-conversion-create', '/api/alos4-conversion-run')
+                        '/api/alos4-conversion-create', '/api/alos4-conversion-run',
+                        '/api/comparison-start', '/api/research-report-start', '/api/legacy-preview', '/api/legacy-create')
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
         def send(self, value, status=200, mime='application/json'):
-            data = json.dumps(value, ensure_ascii=False).encode() if mime == 'application/json' else value
+            data = json.dumps(value, ensure_ascii=False).encode() if mime == 'application/json' and not isinstance(value, (bytes, bytearray)) else value
             self.send_response(status)
             self.send_header('Content-Type', mime)
             self.send_header('Content-Length', str(len(data)))
@@ -89,7 +98,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -100,6 +109,18 @@ def make_server(engine, port=8765):
                         data = data.replace(b'__VERSION__', DISPLAY_VERSION.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
+                if u.path == '/api/legacy-import': return self.send(legacy.get(q['preview'][0]))
+                if u.path == '/api/comparison-candidates': return self.send(comparisons.candidates(q['id'][0]))
+                if u.path == '/api/comparisons': return self.send({'comparisons':comparisons.listing(q['id'][0])})
+                if u.path == '/api/comparison': return self.send(comparisons.get(q['id'][0],q['comparison'][0]))
+                if u.path == '/api/research-reports': return self.send({'reports':reports.listing(q['id'][0])})
+                if u.path == '/api/research-report': return self.send(reports.get(q['id'][0],q['report'][0]))
+                if u.path == '/api/tops-validation': return self.send(tops_validation.inspect(q['id'][0]))
+                if u.path in ('/api/comparison-artifact','/api/research-report-artifact','/api/tops-validation-artifact'):
+                    if u.path == '/api/comparison-artifact':p=comparisons.artifact(q['id'][0],q['comparison'][0],q['file'][0])
+                    elif u.path == '/api/research-report-artifact':p=reports.artifact(q['id'][0],q['report'][0],q['file'][0])
+                    else:p=tops_validation.artifact(q['id'][0],q['file'][0])
+                    return self.send(p.read_bytes(),mime=mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
                 if u.path == '/api/workspace':
                     moving = migrations.busy()
                     return self.send(dict(overview(engine,analyses,nisar_jobs,conversion_jobs,onboarding), workflows=workflow_catalogue(),
@@ -188,6 +209,21 @@ def make_server(engine, port=8765):
                 d=json.loads(self.rfile.read(size))
                 if self.path in migration_writes and migrations.busy():
                     raise ValueError('專案安全搬移進行中，請先完成或暫停搬移，再更改資料或啟動運算。')
+                if self.path in ('/api/comparison-start','/api/research-report-start','/api/legacy-preview','/api/legacy-create'):
+                    if engine.active or nisar_jobs.active or conversion_jobs.active or onboarding.runtime.status().get('status')=='running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請等待目前運算或安裝結束，再開始成果整理或匯入。')
+                if self.path == '/api/comparison-start':return self.send(comparisons.start(d['id'],d['left'],d['right']))
+                if self.path == '/api/comparison-stop':
+                    comparisons.cancel(d['id'],d['comparison']);return self.send(comparisons.get(d['id'],d['comparison']))
+                if self.path == '/api/comparison-point':return self.send(comparisons.point(d['id'],d['comparison'],d['y'],d['x'],d.get('side','left')))
+                if self.path == '/api/research-report-start':return self.send(reports.start(d['id'],d))
+                if self.path == '/api/research-report-stop':
+                    reports.stop(d['id'],d['report']);return self.send(reports.get(d['id'],d['report']))
+                if self.path == '/api/legacy-preview':return self.send(legacy.preview(d))
+                if self.path == '/api/legacy-create':return self.send(legacy.create(d['preview_id'],d.get('reviewed') is True))
+                if self.path == '/api/legacy-stop':
+                    legacy.stop(d['preview_id']);return self.send(legacy.get(d['preview_id']))
+                if self.path == '/api/tops-validation-review':return self.send(tops_validation.save(d['id'],d))
                 if self.path in ('/api/migration-plan', '/api/migration-copy', '/api/migration-switch'):
                     if engine.active or nisar_jobs.active or conversion_jobs.active or onboarding.runtime.status().get('status')=='running' or any(j['status']=='running' for j in onboarding.jobs.values()):
                         raise ValueError('請先完成目前運算或安裝，再開始搬移。')
@@ -269,9 +305,11 @@ def make_server(engine, port=8765):
                 if self.path == '/api/confirmation-saved': return self.send(saved_review(engine,d['id']))
                 if self.path == '/api/project-check':
                     s = engine.get(d['id'])
+                    if s.get('import_only'):raise ValueError('匯入成果請使用成果品質檢查；原始影像前處理不由工作台接續。')
                     return self.send(tops_preflight(s['config'],existing=True) if s['config'].get('workflow')=='topsApp' else check_project(s['config'], existing=True))
                 if self.path == '/api/recovery-enable':
                     if type(d.get('enabled')) is not bool: raise ValueError('請選擇是否啟用保護。')
+                    if engine.get(d['id']).get('import_only'):raise ValueError('外部成果匯入專案不接續或復原原始 ISCE2 運算。')
                     engine.require_processing_location(d['id'])
                     engine.recovery_enable(d['id'],d['enabled']); return self.send({'ok':True})
                 if self.path == '/api/create':
@@ -294,6 +332,7 @@ def make_server(engine, port=8765):
                 if self.path == '/api/geo-figure':return self.send(analyses.geo_figure(d['id'],d['run'],d))
                 if self.path == '/api/analysis-rename':return self.send(analyses.rename(d['id'],d['run'],d['name']))
                 if self.path == '/api/action':
+                    if engine.get(d['id']).get('import_only'):raise ValueError('外部成果匯入專案僅提供品質檢查與新 MintPy 分析，不接續原始指令。')
                     s = engine.require_processing_location(d['id'])
                     if s['config'].get('workflow')=='topsApp':
                         TopsWorkflow(engine).verify(s)
@@ -309,6 +348,9 @@ def make_server(engine, port=8765):
             except Exception as e: self.send({'error':str(e)},400)
     class Server(ThreadingHTTPServer):
         def server_close(self):
+            comparisons.shutdown()
+            reports.shutdown()
+            legacy.shutdown()
             migrations.stop()
             storage_usage.stop(shutdown=True)
             super().server_close()
@@ -318,6 +360,10 @@ def make_server(engine, port=8765):
     server.conversion_jobs = conversion_jobs
     server.storage_usage = storage_usage
     server.migrations = migrations
+    server.comparisons = comparisons
+    server.reports = reports
+    server.legacy = legacy
+    server.tops_validation = tops_validation
     return server
 
 def main():

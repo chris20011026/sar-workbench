@@ -31,6 +31,7 @@ STATUS = {
     'processed': ('attention', '等待整理成果'), 'failed': ('attention', '需要處理'),
     'stopped': ('attention', '已停止'), 'cancelled': ('attention', '已停止'),
     'interrupted': ('attention', '服務曾中斷'), 'orphaned': ('attention', '前次程序仍在執行'),
+    'imported': ('attention', '外部成果已匯入，待品質檢查'),
     'complete': ('complete', '已完成'), 'unavailable': ('unavailable', '位置無法讀取'),
     'offline': ('unavailable', '儲存裝置未連線'), 'relocated': ('attention', '已找到新位置'),
     'wrong_disk': ('attention', '磁碟身分不符'),

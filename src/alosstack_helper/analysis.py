@@ -80,7 +80,11 @@ class Analyses:
     def create(self,key,kind,data):
         if kind not in ('quality','mintpy'):raise ValueError('未知分析種類。')
         with self.engine.lock:
-            self.reserve();s=self.engine.require_processing_location(key,check_inputs=False);inv=inventory(s)
+            self.reserve();s=self.engine.require_processing_location(key,check_inputs=False)
+            if s.get('import_only'):
+                from .legacy import require_legacy_source
+                require_legacy_source(s)
+            inv=inventory(s)
             env=Path(data.get('environment') or s['config']['env']).expanduser().resolve()
             if not (env/'bin/python').is_file():raise ValueError('找不到分析環境的 Python。')
             conda = find_conda(env)
@@ -110,6 +114,10 @@ class Analyses:
     def invert(self,key,run,data):
         with self.engine.lock:
             self.reserve();self.engine.require_processing_location(key,check_inputs=False);p=self.folder(key,run);job=self.get(key,run)
+            s=self.engine.get(key)
+            if s.get('import_only'):
+                from .legacy import require_legacy_source
+                require_legacy_source(s)
             if job['kind']!='mintpy' or job['status']!='loaded':raise ValueError('請先完成載入。失敗分析請建立新版本，不覆寫半成品。')
             if not data.get('reviewed'):raise ValueError('請先確認配對、覆蓋與參考設定。')
             if fingerprint(job['inventory']['files'])!=job['source_fingerprint']:raise ValueError('来源影像或 metadata 已改變，請建立新分析版本。')

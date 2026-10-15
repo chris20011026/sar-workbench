@@ -10,7 +10,7 @@
  $('project').insertBefore(box,$('project').querySelector('.project-settings'));
  let selected=null, stateKey=null, serial=0;
  window.recoveryUpdate=s=>{
-   const stack=(s.config.workflow||'alosStack')==='alosStack';box.hidden=!stack;if(!stack)return;
+   const stack=(s.config.workflow||'alosStack')==='alosStack'&&!s.import_only;box.hidden=!stack;if(!stack)return;
    const next=s.id+':'+s.status+':'+(s.recovery?.id||'')+':'+(s.error||'');
    if(stateKey!==next){stateKey=next;output.replaceChildren();serial++;if(['new','ready','review','failed'].includes(s.status))box.open=true;}
    selected=s;toggle.checked=!!s.recovery_enabled;

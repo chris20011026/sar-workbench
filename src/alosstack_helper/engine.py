@@ -348,6 +348,8 @@ class Engine:
             if self.active:
                 raise ValueError('已有工作執行中，請等待或停止。')
             s = self.require_processing_location(key)
+            if s.get('import_only'):
+                raise ValueError('外部成果匯入專案僅提供品質檢查與 MintPy，不接續原始 ISCE2 指令。')
             if process_alive(self.paths(s)[2]):
                 raise ValueError('仍有先前工作留下的運算程序，請先確認已停止。')
             if s['config'].get('workflow')=='topsApp':
