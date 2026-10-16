@@ -196,6 +196,15 @@ class ConversionQualityTests(unittest.TestCase):
             self.verify()
         self.assertEqual(caught.exception.report['status'], 'failed')
 
+    def test_upstream_reader_needs_no_locally_patched_sampling_helper(self):
+        from isceobj.Sensor.MultiMode.ALOS2 import ALOS2
+        # Keep the actual readLeader and CEOS decoder. Only make a non-upstream
+        # convenience method unavailable, as it is in a clean installation.
+        with patch.object(ALOS2, 'getRangeSamplingRate', None, create=True):
+            result = self.verify()
+        self.assertEqual(result['reader']['status'], 'passed')
+        self.assertAlmostEqual(result['reader']['range_sampling_hz'], 98242186.9)
+
     def test_prefix_mutation_or_truncation_is_rejected(self):
         path = next(self.output.glob('IMG-HV-*')); original = path.read_bytes()
         with path.open('r+b') as f: f.seek(720 + 56); f.write(struct.pack('>I', 12))

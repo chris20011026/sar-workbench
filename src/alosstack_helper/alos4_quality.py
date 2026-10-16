@@ -315,8 +315,11 @@ def _reader(targets, expected_images, expected_scene, identities):
             _need(result and len(result) == 4, 'ISCE2 readLeader 未傳回完整中繼資料。')
             leader, scene, orbit, facility = result
             _need(scene.metadata['Product level code'].strip() == '1.1', 'ISCE2 未識別 Level 1.1。')
-            rate = sensor.getRangeSamplingRate(scene)
-            _need(math.isfinite(rate) and math.isclose(rate, expected_scene['range_sampling_mhz'] * 1e6, rel_tol=1e-5),
+            # readLeader's decoded CEOS field is part of upstream ISCE2.
+            # getRangeSamplingRate exists only in some locally patched readers;
+            # this metadata audit must also work with an unmodified installation.
+            rate = float(scene.metadata['Range sampling rate in MHz']) * 1e6
+            _need(math.isfinite(rate) and rate > 0 and math.isclose(rate, expected_scene['range_sampling_mhz'] * 1e6, rel_tol=1e-5),
                   'ISCE2 讀取的採樣率與來源不一致。')
             _need(0 < orbit.metadata['Number of data points'] <= 10000, 'ISCE2 讀取的軌道向量數不合法。')
             _need(len(orbit.metadata.get('Positional Data Points', [])) == orbit.metadata['Number of data points'], 'ISCE2 軌道向量不完整。')
