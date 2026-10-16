@@ -28,6 +28,7 @@ STATUS = {
     'checking': ('running', '檢查中'), 'running': ('running', '執行中'), 'stopping': ('running', '停止中'),
     'review': ('attention', '等待人工判讀'), 'loaded': ('attention', '等待分析設定'),
     'pair_ready': ('attention', '等待確認配對'), 'tops_ready': ('attention', '等待確認 burst'),
+    'sampling_review': ('attention', '等待確認影格與取樣'),
     'processed': ('attention', '等待整理成果'), 'failed': ('attention', '需要處理'),
     'stopped': ('attention', '已停止'), 'cancelled': ('attention', '已停止'), 'partial': ('attention', '部分完成'),
     'interrupted': ('attention', '服務曾中斷'), 'orphaned': ('attention', '前次程序仍在執行'),

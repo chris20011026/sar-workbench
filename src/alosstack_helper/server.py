@@ -102,7 +102,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css', '/sampling.js', '/sampling.css'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -360,10 +360,10 @@ def make_server(engine, port=8765):
                     if s['config'].get('workflow')=='topsApp':
                         TopsWorkflow(engine).verify(s)
                         engine.launch(d['id'],d['action'],options=d);return self.send({'ok':True})
-                    if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover'):
+                    if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover', 'sampling_continue'):
                         report = require_preflight(s['config'], existing=True)
                         atomic_json(engine.paths(s)[2]/'preflight.json', report)
-                    if d['action'] in ('prepare','run'):
+                    if d['action'] in ('prepare','run','sampling_continue'):
                         verify_saved_inputs(s,engine.paths(s)[2])
                     engine.launch(d['id'],d['action'],d.get('excluded'),d); return self.send({'ok':True})
                 if self.path == '/api/stop': engine.stop(); return self.send({'ok':True})

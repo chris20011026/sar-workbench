@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 from .core import atomic_json, digest
 
 PHASES = {
+    'cmd1 · 讀取資料': 'run', 'cmd1 · 統一取樣': 'run',
     'cmd1 · 對位與幾何': 'run', 'cmd2 · 干涉配對': 'run',
     'cmd3 · 電離層估計': 'run', '產生瀏覽器檢查圖片': 'run',
     '估計各日期電離層': 'continue', '套用電離層校正': 'continue',

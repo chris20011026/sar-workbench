@@ -1,6 +1,13 @@
-# SAR Workbench 0.8.0 beta 2
+# SAR Workbench 0.8.0 beta 3
 
 此版把已完成的 SAR 處理成果接入比較與研究報告，並提供手動 alosStack 成果匯入及 Sentinel-1 真實影像評閱紀錄。新增工具讀取既有結果，衍生成果另存；不因比較或產生報告重新執行 ISCE2／MintPy。
+
+## Beta 3：讀取後統一取樣
+
+- alosStack 的新專案可選擇共同影格並啟用[取樣統一](ALOS_SAMPLING.md)。依序讀取、人工核對影格、統一 RSR／PRF，再進行原本的匹配及干涉。
+- 支援 `-virtual` 的 CEOS 原始影像來源，不要求事先生成實體 SLC。需要重取樣的影像才寫出新 SLC，並同步更新描述檔及多項式。
+- 人工確認綁定當次輸入；保留取樣前原件與階段副本。中斷、來源變動或不完整輸出會阻止匹配，不重複插值。
+- 維持選用功能，既有專案不自動變更。限支援的 Stripmap 模式；跨衛星完整真實干涉品質尚待驗證。
 
 ## Beta 2：ALOS 批次資料準備
 
@@ -24,13 +31,15 @@
 
 ## 安裝與更新
 
-版本標籤為 `v0.8.0-beta.2`，Mac 下載包為 `SAR-Workbench-0.8.0-beta.2-macOS-arm64.zip`。需要 Apple Silicon 與 macOS 14.5 以上。首次啟動可準備工作台專用工具，無須預先安裝 Python 或 Conda；操作見[第一次使用](FIRST_USE.md)。
+版本標籤為 `v0.8.0-beta.3`，Mac 下載包為 `SAR-Workbench-0.8.0-beta.3-macOS-arm64.zip`。需要 Apple Silicon 與 macOS 14.5 以上。首次啟動可準備工作台專用工具，無須預先安裝 Python 或 Conda；操作見[第一次使用](FIRST_USE.md)。
 
 已有 App 的使用者應先完成或停止背景工作，再結束舊 App 並更換新版。沿用原工具與狀態目錄，即可保留環境及專案登記。這次新增的是工作台功能，沒有變更科學套件鎖定清單，也不要求為新介面重裝環境。
 
 本版仍採 ad-hoc 簽署，未經 Apple Developer ID 簽署與公證。由正式 Release 下載並核對其 SHA256；不需關閉整台電腦的 Gatekeeper。ISCE3／NISAR 保持獨立實驗環境，不混入 ISCE2 環境。
 
 ## 驗證狀態
+
+Beta 3 新增真正 ISCE2 原生核心的小型複數影像測試，涵蓋 MSB／CEOS 列填充的虛擬來源、實體 SLC、升降取樣、相位與係數、過期確認、原始檔案保存，以及發佈中斷後從恢復中心還原並重新取樣。網頁另測試共同影格選擇、未確認時阻擋、輪詢保留輸入與報告變更使確認失效。這些是合成數值及流程驗證，尚未宣稱完成真實 ALOS-2／ALOS-4 混合干涉驗證。
 
 Beta 2 的本機原生 ARM 環境 **501 項 Python 測試全部通過，沒有跳過**，四組前端狀態測試、全站 JavaScript 語法與含原生選檔元件的 Mac App 建置亦通過。新版原生視窗已在使用者桌面實際顯示並成功選取資料夾；下載版內含選檔元件，不需另裝 Xcode。
 
@@ -41,7 +50,7 @@ Beta 2 已在隔離測試位置完成兩份真實 ALOS-4 FWD Level 1.1 雙極化
 
 Beta 1 的本機原生 ARM 科學環境 408 項測試全部通過，沒有跳過；另外通過兩組瀏覽器狀態測試、全部前端腳本語法檢查，以及桌面／窄螢幕操作檢查。11 頁 Word 範例已實際渲染並逐頁檢查。測試涵蓋來源唯讀、匯入結構與變動檢查、禁止匯入專案重跑原始階段、比較相容性與原生數值、報告輸出與來源追溯，以及過期評閱、取消和存取限制。標準 alosStack 合成資料亦經已安裝的 ISCE2 中繼資料載入及 MintPy `load_data`／`modify_network` 驗證，確認來源檔案未變更。
 
-GitHub Actions 使用乾淨的 ARM Mac 建置 App、啟動專用 Miniforge、安裝固定科學環境、執行環境檢查與合成資料驗證，再測試包內伺服器。Release 附件只使用同一發布 commit 成功驗證的建置產物；實際結果與 Actions 連結見 [Release](https://github.com/chris20011026/sar-workbench/releases/tag/v0.8.0-beta.2) 與 [Workbench validation](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)。本機通過不代替這項發布關卡。
+GitHub Actions 使用乾淨的 ARM Mac 建置 App、啟動專用 Miniforge、安裝固定科學環境、執行環境檢查與合成資料驗證，再測試包內伺服器。Release 附件只使用同一發布 commit 成功驗證的建置產物；實際結果與 Actions 連結見 [Release](https://github.com/chris20011026/sar-workbench/releases/tag/v0.8.0-beta.3) 與 [Workbench validation](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)。本機通過不代替這項發布關卡。
 
 上述測試驗證軟體行為與合成數值，不是所有研究資料的科學品質保證。目前仍未完成：
 

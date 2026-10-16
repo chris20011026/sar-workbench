@@ -79,6 +79,22 @@ class PreflightTests(unittest.TestCase):
         next((self.base/'data/200201').glob('IMG-HH-*0490-*')).unlink()
         self.assertEqual(self.errors(),[])
 
+    def test_stack_sampling_selects_common_frames_without_inventing_correspondence(self):
+        for p in (self.base/'data/200201').glob('*0490-*'): p.unlink()
+        self.assertIn('frame 組合不同',''.join(self.errors()))
+        self.config['properties']['frames']='["0480"]'
+        self.config['sampling_equalization']=True
+        self.assertEqual(self.errors(),[])
+        r=check_project(self.config)
+        self.assertTrue(any(x['key']=='sampling' and x['status']=='warning' for x in r['checks']))
+        self.config['properties']['frames']='["0490"]'
+        self.assertTrue(self.errors())
+
+    def test_sampling_does_not_silently_accept_scansar(self):
+        for p in (self.base/'data').rglob('*FBDR1.1__A'):p.rename(p.with_name(p.name.replace('FBD','WBS')))
+        self.config['sampling_equalization']=True
+        self.assertIn('Stripmap',''.join(self.errors()))
+
     def test_api_rechecks_at_create_and_launch_without_starting_science(self):
         import re
         import threading

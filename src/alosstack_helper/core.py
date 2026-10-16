@@ -84,7 +84,7 @@ def write_xml(config, dest):
     ET.indent(root)
     ET.ElementTree(root).write(dest, encoding='utf-8', xml_declaration=True)
 
-def inspect_data(path):
+def inspect_data(path, frames=None):
     p = Path(path).expanduser()
     if not p.is_dir():
         raise ValueError('資料目錄不存在或 NAS 尚未掛載。')
@@ -94,6 +94,9 @@ def inspect_data(path):
             datetime.datetime.strptime(folder.name, '%y%m%d')
             led = list(folder.glob('LED-ALOS2*'))
             images = list(folder.glob('IMG-*ALOS2*'))
+            if frames:
+                led = [x for x in led if x.name.split('-')[1][-4:] in frames]
+                images = [x for x in images if x.name.split('-')[2][-4:] in frames]
             dates.append({'date': folder.name, 'leaders': len(led), 'images': len(images),
                           'frames': sorted({x.name.split('-')[1][-4:] for x in led}),
                           'polarizations': sorted({x.name.split('-')[1] for x in images}),
@@ -103,6 +106,7 @@ def inspect_data(path):
         if dates and row['leaders']!=dates[0]['leaders']:row['warnings'].append('frame 數量與第一個日期不同')
         if len(row['frames'])!=row['leaders']:row['warnings'].append('存在重複 frame 產品，請確認是否混入不同版本')
         if len(row['modes'])>1:row['warnings'].append('同一天含不同觀測模式')
+        if frames and set(row['frames']) != set(frames): row['warnings'].append('缺少指定的 frame')
     return dates
 
 def parse_cmd3(text):

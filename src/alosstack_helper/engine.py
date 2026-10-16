@@ -16,6 +16,7 @@ from .inputs import prepare_raster
 from .environment import isolated_env
 from .recovery import Recovery, PHASES, process_alive
 from .storage import ProjectStorage, read_project, absolute, atomic_existing_json, WORKFLOWS
+from . import sampling
 
 RESOLVE_CONFIG_SCRIPT = "import sys, os, json\nsys.path.insert(0, os.path.join(os.environ['ISCE_STACK'], 'alosStack'))\nfrom StackPulic import loadStackUserParameters\nsys.argv = ['helper', 'alosStack.xml']\ns = loadStackUserParameters('alosStack.xml')\njson.dump(dict(estimate=bool(s.doIon), apply=bool(s.applyIon), subsequent=s.numberOfSubsequentDates, subsequent_ion=s.numberOfSubsequentDatesIon), open('helper_resolved.json', 'w'))\n"
 
@@ -255,7 +256,9 @@ class Engine:
             c[name] = str(safe_path(c[name]))
         if not Path(c['env'], 'bin/python').is_file():
             raise ValueError('請選擇含 bin/python 的 Conda 環境資料夾。')
-        dates = inspect_data(c['source'])
+        if type(c.get('sampling_equalization', False)) is not bool:
+            raise ValueError('取樣統一必須是啟用或關閉。')
+        dates = inspect_data(c['source'], sampling.selected_frames(c))
         if len(dates) < 2 or any(not x['leaders'] or not x['images'] for x in dates):
             raise ValueError('需至少兩個 YYMMDD 資料夾，且每個包含 LED-ALOS2 與 IMG 檔。ZIP 請先依研究室流程整理。')
         problems=[x['date']+'：'+','.join(x.get('warnings',[])) for x in dates if x.get('warnings')]
@@ -375,6 +378,14 @@ class Engine:
                 threading.Thread(target=self.recover_worker,args=(s,options['snapshot']),daemon=True).start()
                 return
             expected = {'prepare': 'new', 'run': 'ready', 'continue': 'review'}
+            if action == 'sampling_continue':
+                if s['status'] != 'sampling_review' or not s['config'].get('sampling_equalization'):
+                    raise ValueError('目前不在取樣／影格檢查關卡。')
+                self.verify_commands(s)
+                sampling.approve(s, options or {}, self.paths(s)[1])
+                self.resume_phase = sampling.APPLY_PHASE
+                action = 'run'
+                expected['run'] = 'sampling_review'
             retry_prepare = action == 'prepare' and self.can_retry_prepare(s)
             if s['status'] != expected.get(action) and not retry_prepare:
                 raise ValueError('目前階段不允許這個操作。')
@@ -395,7 +406,7 @@ class Engine:
             try: Recovery(self,s).capture(label,self.worker_action)
             except Exception:
                 # Nothing scientific has run if the very first baseline failed.
-                if label=='cmd1 · 對位與幾何' and not s.get('recovery'):
+                if label in ('cmd1 · 對位與幾何', sampling.READ_PHASE) and not s.get('recovery'):
                     s['retry_first_snapshot']=True
                 raise
             s.pop('retry_first_snapshot',None)
@@ -408,7 +419,7 @@ class Engine:
         with self.lock:
             s=self.require_processing_location(key)
             if self.active or process_alive(self.paths(s)[2]): raise ValueError('運算中不能變更復原保護。')
-            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review'):
+            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review','sampling_review'):
                 raise ValueError('只能在多日期運算開始前或人工判讀時變更後續保護。')
             s['recovery_enabled']=bool(enabled); self.save(s)
 
@@ -495,6 +506,8 @@ class Engine:
                     self.run(s, ['python', str(Path(c['env'])/'share/isce2/alosStack/create_cmds.py'), '-stack_par', 'alosStack.xml'], conda=True)
                     text = (proc / 'cmd_3.sh').read_text()
                     names = ['alosStack.xml', 'cmd_1.sh', 'cmd_2.sh', 'cmd_3.sh', 'cmd_4.sh', 'helper_resolved.json']
+                    if c.get('sampling_equalization'):
+                        names.extend(sampling.prepare(self, s, proc))
                     s['expected_pairs'] = declared_pairs((proc/'cmd_2.sh').read_text(), 'insarpair')
                     if s['ion']['estimate']:
                         (proc / 'helper_cmd3_before_review.sh').write_text(split_pre_review(text))
@@ -513,8 +526,11 @@ class Engine:
                 s.update(status='ready', stage='已準備，可開始運算')
             elif action == 'run':
                 self.verify_commands(s)
-                for name, label in [('cmd_1.sh', 'cmd1 · 對位與幾何'), ('cmd_2.sh', 'cmd2 · 干涉配對')]:
-                    self.checkpoint(s, label, lambda name=name: self.shell(s, proc/name))
+                if c.get('sampling_equalization'):
+                    if not sampling.before_matching(self, s, proc): return
+                else:
+                    self.checkpoint(s, 'cmd1 · 對位與幾何', lambda: self.shell(s, proc/'cmd_1.sh'))
+                self.checkpoint(s, 'cmd2 · 干涉配對', lambda: self.shell(s, proc/'cmd_2.sh'))
                 if not s.get('ion', {}).get('estimate', True):
                     self.log(s, '電離層估計已關閉：跳過 cmd3、ion_ls 與 ion_correct。')
                     self.finish(s, s['expected_pairs'])

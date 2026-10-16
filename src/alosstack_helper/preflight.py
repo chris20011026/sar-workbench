@@ -9,6 +9,7 @@ import shutil
 from .core import safe_path, find_conda
 from .onboarding import PRODUCT, inspect_terrain
 from .runtime import workbench_home
+from .sampling import selected_frames
 
 
 def check_project(c, existing=False):
@@ -62,6 +63,9 @@ def check_project(c, existing=False):
         if len(dates) < 2: raise ValueError('需至少兩個不同的 YYMMDD 日期資料夾。')
         pol = c.get('properties', {}).get('polarization', 'HH').upper() or 'HH'
         if pol not in ('HH', 'HV', 'VH', 'VV'): raise ValueError('請選 HH、HV、VH 或 VV。')
+        frames_selected = c.get('frames', []) if workflow == 'alos2App' else selected_frames(c)
+        if type(c.get('sampling_equalization', False)) is not bool:
+            raise ValueError('取樣統一選項必須是啟用或關閉。')
         for folder in dates:
             datetime.datetime.strptime(folder.name, '%y%m%d')
             leaders, images, frames = {}, {}, set()
@@ -70,7 +74,7 @@ def check_project(c, existing=False):
                 if not match: continue
                 identity, date, mode = match.groups()
                 frame = identity[-4:]
-                if workflow == 'alos2App' and c.get('frames') and frame not in c['frames']: continue
+                if frames_selected and frame not in frames_selected: continue
                 if date != folder.name: raise ValueError(p.name+' 的日期與資料夾不符。')
                 if '1.1' not in mode: raise ValueError(p.name+' 不是 Level 1.1。')
                 if not p.name.startswith('LED-') and not p.name.startswith('IMG-'+pol+'-'): continue
@@ -85,9 +89,15 @@ def check_project(c, existing=False):
             if not leaders or leaders != images:
                 raise ValueError(folder.name+' 的每個 frame 都必須有對應的 LED 與 '+pol+' IMG（同產品／版本）。')
             frames_by_date[folder.name] = frames
+            if frames_selected and frames != set(frames_selected):
+                raise ValueError(folder.name+' 缺少所選 frame，不能自動替代或拼接。')
         if len(modes) != 1: raise ValueError('日期之間的觀測模式／版本不一致，請先分组。')
         if any(x != next(iter(frames_by_date.values())) for x in frames_by_date.values()):
-            raise ValueError('日期之間的 frame 組合不同。雙日期可只選共同 frame。')
+            raise ValueError('日期之間的 frame 組合不同。可在處理設定選擇共同 frame；地理對應仍需人工確認。')
+        if c.get('sampling_equalization'):
+            if any(m[:3] not in ('UBS','UBD','HBS','HBD','HBQ','FBS','FBD','FBQ') for m in modes):
+                raise ValueError('取樣統一目前限 Stripmap；ScanSAR／Spotlight 尚未開放此步驟。')
+            add('sampling', 'warning', '讀取後統一取樣', '讀取後會停在影格人工確認關卡，再依參考日期的 RSR／PRF 重取樣。ALOS-4 須先轉換格式；同一 frame 編號不保證地理對應，跨衛星科學品質尚需驗證。')
         if c.get('reference') not in frames_by_date: raise ValueError('參考日期不在本次資料中。')
         add('products', 'pass', '日期、frame、極化與讀取', f'{len(dates)} 個日期，{len(files)} 個 LED／IMG；{pol}。首筆 CEOS 紀錄可讀取。')
         add('orbit', 'warning', '軌道與完整性仍需確認', '檔名與首筆紀錄無法證明整幅影像完整或同軌。請核對資料提供者的軌道、方向與覆蓋；ISCE2 準備階段還會讀取詳細 metadata。')

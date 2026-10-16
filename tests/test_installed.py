@@ -112,6 +112,13 @@ class InstalledGeneratorTest(unittest.TestCase):
             pre=base/'pre.sh';pre.write_text(split_pre_review(script))
             self.assertEqual(subprocess.run(['/bin/bash','-n',str(pre)]).returncode,0)
             for n in range(1,5):self.assertTrue((base/f'cmd_{n}.sh').exists())
+            from alosstack_helper.sampling import split_read_command
+            request,later=split_read_command((base/'cmd_1.sh').read_text(),{**cfg,'env':str(env)})
+            self.assertEqual(request['reference'],'151113')
+            self.assertNotIn('read_data.py',later)
+            self.assertIn('estimate_slc_offset.py',later)
+            (base/'after-read.sh').write_text(later)
+            self.assertEqual(subprocess.run(['/bin/bash','-n',str(base/'after-read.sh')]).returncode,0)
             for estimate,apply in [(False,False),(False,True),(True,False),(True,True)]:
                 with self.subTest(estimate=estimate,apply=apply):
                     cfg['properties'].update({'do ionospheric phase estimation':str(estimate),'apply ionospheric phase correction':str(apply)})

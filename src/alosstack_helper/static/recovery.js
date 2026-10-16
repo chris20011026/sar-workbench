@@ -12,14 +12,14 @@
  window.recoveryUpdate=s=>{
    const stack=(s.config.workflow||'alosStack')==='alosStack'&&!s.import_only;box.hidden=!stack;if(!stack)return;
    const next=s.id+':'+s.status+':'+(s.recovery?.id||'')+':'+(s.error||'');
-   if(stateKey!==next){stateKey=next;output.replaceChildren();serial++;if(['new','ready','review','failed'].includes(s.status))box.open=true;}
+   if(stateKey!==next){stateKey=next;output.replaceChildren();serial++;if(['new','ready','review','sampling_review','failed'].includes(s.status))box.open=true;}
    selected=s;toggle.checked=!!s.recovery_enabled;
-   toggle.disabled=!!window.workbenchState?.busy||!['new','ready','review'].includes(s.status);
+   toggle.disabled=!!window.workbenchState?.busy||!['new','ready','review','sampling_review'].includes(s.status);
    diagnose.disabled=!!window.workbenchState?.busy;
    description.textContent=s.status==='failed'?'工作已停止。先查看診斷，再決定是否還原階段前副本。':s.recovery_enabled?'復原保護已開啟。下次主要階段執行前會保存副本，空間或驗證不足時會停止。':'本專案尚未開啟復原保護。可在開始運算前或人工判讀時啟用；無法補建過去失敗前的副本。';
    if(s.status==='failed')box.open=true;
  };
- toggle.addEventListener('change',async()=>{const key=selected?.id;if(!key)return;toggle.disabled=true;try{await api('/api/recovery-enable',{id:key,enabled:toggle.checked});await refresh();}catch(e){fail(e);toggle.checked=!!selected?.recovery_enabled;}finally{if(selected?.id===key)toggle.disabled=!!window.workbenchState?.busy||!['new','ready','review'].includes(selected.status);}});
+ toggle.addEventListener('change',async()=>{const key=selected?.id;if(!key)return;toggle.disabled=true;try{await api('/api/recovery-enable',{id:key,enabled:toggle.checked});await refresh();}catch(e){fail(e);toggle.checked=!!selected?.recovery_enabled;}finally{if(selected?.id===key)toggle.disabled=!!window.workbenchState?.busy||!['new','ready','review','sampling_review'].includes(selected.status);}});
  action(diagnose,async()=>{
    const id=selected?.id, generation=++serial;if(!id)return;
    diagnose.disabled=true;output.replaceChildren(node('p','正在讀取診斷…'));

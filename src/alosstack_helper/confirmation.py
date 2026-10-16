@@ -15,6 +15,7 @@ from .environment import isolated_env
 from .metadata import enrich
 from .onboarding import scan_source, inventory_plan
 from .preflight import check_project
+from .sampling import selected_frames
 
 
 def network(pairs, dates):
@@ -106,6 +107,9 @@ def review(config):
         pol=prediction['resolved']['polarization'].upper()
         entries=[e for e in plan['entries'] if e['name'].startswith(('LED-','IMG-'+pol+'-')) and not e['member']
                  and Path(e['source']).parent == Path(config['source'])/e['date']]
+        frames = selected_frames(config)
+        if frames:
+            entries = [e for e in entries if e['name'].split('-')[-3][-4:] in frames]
         plan=enrich(inventory_plan(config['source'],entries),config['env'])
         report['inventory']=plan
         dates=[d['date'] for d in plan['dates']]
