@@ -107,6 +107,33 @@ def image_metadata(entry):
         return out
 
 
+def converted_provenance(leader):
+    if leader.get('member'):
+        return None
+    folder = Path(leader['source']).parent
+    manifest = folder / 'conversion.json'
+    if not manifest.exists():
+        return None
+    if manifest.is_symlink() or manifest.stat().st_size > 1024 * 1024:
+        raise ValueError('轉換來源紀錄不合法')
+    before = manifest.stat()
+    document = json.loads(manifest.read_text())
+    if (document.get('source_sensor') != 'ALOS-4' or
+            document.get('output_format') != 'PALSAR-2 CEOS compatibility'):
+        raise ValueError('轉換來源紀錄不受支援')
+    try:
+        from .alos4_quality import verify_conversion_metadata
+    except ImportError:
+        from alos4_quality import verify_conversion_metadata
+    result = verify_conversion_metadata(document['source'], folder)
+    if result['leader'] != leader['name'] or result['date'] != leader['date']:
+        raise ValueError('轉換來源日期或產品不一致')
+    after = manifest.stat()
+    if (before.st_ino, before.st_mtime_ns, before.st_size) != (after.st_ino, after.st_mtime_ns, after.st_size):
+        raise ValueError('轉換紀錄在檢查期間改變')
+    return result
+
+
 def product_metadata(entries):
     leader = next((e for e in entries if e['name'].startswith('LED-')), entries[0])
     out = dict(key='|'.join([leader['identity'],leader['date'],leader['mode']]),
@@ -125,7 +152,12 @@ def product_metadata(entries):
         sensor = str(scene['Sensor ID and mode of operation for this channel'])
         out['sensor_id'] = sensor
         out['sensor_mode'] = sensor[10:12] if len(sensor)>=12 else None
-        if out['orbit'] and out['orbit'].lstrip('0') != leader['identity'][5:-4].lstrip('0'):
+        provenance = converted_provenance(leader)
+        out['source_sensor'] = 'ALOS-4' if provenance else 'ALOS-2'
+        if provenance:
+            out['conversion_metadata'] = provenance
+            out['warnings'].append('已核對 ALOS-4 原始軌道與轉換描述；檔名為合成相容標籤，仍須人工確認影格對應。')
+        if out['orbit'] and out['orbit'].lstrip('0') != leader['identity'][5:-4].lstrip('0') and not provenance:
             out['errors'].append('LED 軌道圈次與檔名不同')
         timestamp = str(scene['Scene centre time']).strip()
         center = dt.datetime.strptime(timestamp[:14], '%Y%m%d%H%M%S')
@@ -166,13 +198,20 @@ def product_metadata(entries):
     return out
 
 
-def summarize(products):
+def summarize(products, allow_cross_sensor=False):
     from shapely.geometry import shape, mapping
     from shapely.ops import unary_union
     errors, warnings = [], []
     groups = {}
     for product in products:
-        key = (product['direction'], product['look'], product['sensor_mode'], product['product_mode'], product.get('sensor_id'))
+        sensor = (product.get('sensor_id') or '').rstrip('- ')
+        mission = product.get('source_sensor', 'ALOS-2')
+        # Only the explicitly gated sampling workflow can combine validated
+        # ALOS-4 compatibility products with native ALOS-2 observations.
+        if allow_cross_sensor and mission in ('ALOS-2', 'ALOS-4'):
+            mission = 'ALOS-2/4 manual review'
+        key = (product['direction'], product['look'], product['sensor_mode'], product['product_mode'], sensor, mission)
+        warnings += product.get('warnings', [])
         groups.setdefault(key, []).append(product['key'])
         errors += [product['date']+' / '+product['frame']+'：'+e for e in product['errors']]
     if len(groups)>1:
@@ -200,12 +239,12 @@ def summarize(products):
         else: common = mapping(overlap)
     else:
         warnings.append('部分影像尚無可信邊界：不自動帶入 DEM 範圍，也不宣稱已核對共同覆蓋。')
-    return dict(products=products, groups=[dict(direction=k[0],look=k[1],sensor_mode=k[2],mode=k[3],sensor_id=k[4],keys=v) for k,v in groups.items()],
+    return dict(products=products, groups=[dict(direction=k[0],look=k[1],sensor_mode=k[2],mode=k[3],sensor_id=k[4],source_sensor=k[5],keys=v) for k,v in groups.items()],
                 errors=errors, warnings=warnings, bounds=bounds, coverage=union, common=common,
                 complete=complete, note='影像記錄座標的概略邊界；共同覆蓋不代表相干性或有效形變成果。相同升降軌不等於相同相對軌道。')
 
 
-def inspect(entries):
+def inspect(entries, allow_cross_sensor=False):
     import isce  # Configure upstream namespace before CEOS.
     groups = {}
     for entry in entries:
@@ -213,7 +252,7 @@ def inspect(entries):
         if [source.stat().st_size,source.stat().st_mtime_ns] != entry['stamp']:
             raise ValueError('來源在掃描後改變，請重新掃描。')
         groups.setdefault((entry['identity'],entry['date'],entry['mode']), []).append(entry)
-    result = summarize([product_metadata(rows) for rows in groups.values()])
+    result = summarize([product_metadata(rows) for rows in groups.values()], allow_cross_sensor)
     for entry in entries:
         source = Path(entry['source'])
         if [source.stat().st_size,source.stat().st_mtime_ns] != entry['stamp']:
@@ -223,5 +262,6 @@ def inspect(entries):
 
 if __name__ == '__main__':
     # ISCE diagnostics go to worker log; structured output uses a separate file.
-    result = inspect(json.loads(Path(sys.argv[1]).read_text()))
+    request = json.loads(Path(sys.argv[1]).read_text())
+    result = inspect(request['entries'], request.get('allow_cross_sensor') is True) if isinstance(request, dict) else inspect(request)
     Path(sys.argv[2]).write_text(json.dumps(result, ensure_ascii=False, allow_nan=False))

@@ -56,7 +56,7 @@ def fingerprint(config):
     source = Path(config['source'])
     paths = [p for d in sorted(source.iterdir()) if d.is_dir() and d.name.isdigit()
              for p in sorted(d.iterdir()) if p.is_file() and p.name.startswith(('LED-', 'IMG-'))]
-    small = []
+    small = list(source.glob('*/conversion.json'))
     for key in ('dem','dem_geo','wbd'):
         p = Path(config[key]); paths.append(p)
         small += [Path(str(p)+suffix) for suffix in ('.xml','.vrt') if Path(str(p)+suffix).exists()]
@@ -110,7 +110,8 @@ def review(config):
         frames = selected_frames(config)
         if frames:
             entries = [e for e in entries if e['name'].split('-')[-3][-4:] in frames]
-        plan=enrich(inventory_plan(config['source'],entries),config['env'])
+        plan=enrich(inventory_plan(config['source'],entries),config['env'],
+                    allow_cross_sensor=config.get('sampling_equalization') is True)
         report['inventory']=plan
         dates=[d['date'] for d in plan['dates']]
         report['network']=network(prediction['pairs'],dates)

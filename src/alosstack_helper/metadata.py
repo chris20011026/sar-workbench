@@ -9,7 +9,7 @@ from .core import find_conda
 from .environment import isolated_env
 
 
-def enrich(plan, environment=None):
+def enrich(plan, environment=None, allow_cross_sensor=False):
     plan['metadata_environment'] = str(environment or '')
     if not environment:
         plan['metadata'] = dict(products=[],groups=[],errors=[],warnings=['尚無 ISCE2 環境，目前只有檔名清單。安裝工具後重新檢查，或自行確認來源。'],complete=False,bounds=None)
@@ -21,7 +21,7 @@ def enrich(plan, environment=None):
     with tempfile.TemporaryDirectory(prefix='sar-metadata-') as directory:
         folder = Path(directory)
         request, response = folder/'request.json', folder/'response.json'
-        request.write_text(json.dumps(plan['entries']))
+        request.write_text(json.dumps(dict(entries=plan['entries'], allow_cross_sensor=allow_cross_sensor)))
         with (folder/'worker.log').open('w+') as log:
             proc = subprocess.Popen([conda,'run','--no-capture-output','-p',str(prefix),'python',
                                      str(Path(__file__).with_name('metadata_worker.py')),str(request),str(response)],

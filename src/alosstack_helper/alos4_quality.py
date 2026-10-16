@@ -345,6 +345,42 @@ def _reader(targets, expected_images, expected_scene, identities):
         raise ValueError('ISCE2 中繼資料讀取檢查失敗：' + str(exc)) from exc
 
 
+def verify_conversion_metadata(source_product, output_directory):
+    """Verify retained CEOS metadata against the original ALOS-4 product.
+
+    This bounded check establishes provenance for synthetic compatibility names;
+    it does not replace the full image sample audit in verify_conversion().
+    """
+    source = _safe_path(source_product, True)
+    output = _safe_path(output_directory, True)
+    _need(source != output and source not in output.parents and output not in source.parents,
+          '來源與轉換輸出不可互相包含。')
+    sources = product_files(source)
+    led = sources[1].name
+    date, look, node = _date(led[16:22]), led[26], led[27]
+    targets = []
+    for p in sources:
+        name = original_output_name(p.name)
+        targets.append(output / (name[:-7] + look + '1.1__' + node))
+    expected = {p.name for p in targets}
+    actual = {p.name for p in output.iterdir() if p.name.startswith(('VOL-', 'LED-', 'TRL-', 'IMG-'))}
+    _need(actual == expected, '轉換產品檔案不完整或混入其他產品。')
+    identities = {}
+    for p in sources + targets:
+        _safe_path(p)
+        identities[p] = _identity(p)
+    _need(len({(v['device'], v['inode']) for v in identities.values()}) == len(identities),
+          '來源與輸出不可使用硬連結。')
+    metadata, hashes = _metadata(sources, targets, identities, date, look, node, lambda event: None)
+    metadata['checked_fields'] = [x for x in metadata['checked_fields'] if not x.startswith('IMG ')]
+    for p, stamp in identities.items():
+        _need(_identity(p) == stamp, '檢查期間產品已改變。')
+    return dict(status='passed', source_sensor='ALOS-4', date=date.strftime('%y%m%d'),
+                leader=targets[1].name, metadata=metadata,
+                scope='retained CEOS metadata only; image samples not checked',
+                fingerprints=[dict(path=str(p), sha256=h) for p, h in hashes.items()])
+
+
 def verify_conversion(source_product, output_directory, progress=None):
     """Verify one complete source product and its ALOS2_format directory.
 
