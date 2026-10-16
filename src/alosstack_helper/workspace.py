@@ -29,7 +29,7 @@ STATUS = {
     'review': ('attention', '等待人工判讀'), 'loaded': ('attention', '等待分析設定'),
     'pair_ready': ('attention', '等待確認配對'), 'tops_ready': ('attention', '等待確認 burst'),
     'processed': ('attention', '等待整理成果'), 'failed': ('attention', '需要處理'),
-    'stopped': ('attention', '已停止'), 'cancelled': ('attention', '已停止'),
+    'stopped': ('attention', '已停止'), 'cancelled': ('attention', '已停止'), 'partial': ('attention', '部分完成'),
     'interrupted': ('attention', '服務曾中斷'), 'orphaned': ('attention', '前次程序仍在執行'),
     'imported': ('attention', '外部成果已匯入，待品質檢查'),
     'complete': ('complete', '已完成'), 'unavailable': ('unavailable', '位置無法讀取'),
@@ -44,7 +44,7 @@ def timestamp(value):
     except (ValueError, TypeError): return 0
 
 
-def overview(engine, analyses, nisar_jobs, conversions, onboarding):
+def overview(engine, analyses, nisar_jobs, conversions, onboarding, alos_batches=None):
     rows, warnings = [], []
     names = {w['id']: w['name'] for w in workflow_catalogue()}
     def add(kind, key, name, status, stage='', path='', environment='', created=0, error='', action=None, scientific=False):
@@ -84,17 +84,17 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding):
         row['registration'] = dict(id=s['id'], busy=active==s['id'] or active.startswith(s['id']+':'))
         row.update(notes=s.get('notes',''), storage=dict(volume=s.get('volume'), candidates=s.get('candidates',[])),
                    workflow=names.get(s.get('workflow'), '專案紀錄'))
-    for kind, manager in [('nisar', nisar_jobs), ('conversion', conversions)]:
+    for kind, manager in [('nisar', nisar_jobs), ('conversion', conversions), *([('alos_preparation',alos_batches)] if alos_batches else [])]:
         manager.reconcile()
         with manager.lock:
             states = list(manager.jobs.values())
             for s in states:
                 c = s['config']
-                add(kind, s['id'], c['name'], s['status'], s.get('stage', ''), c['root'], c.get('environment', ''),
+                add(kind, s['id'], c['name'], s['status'], s.get('stage', ''), c['root'] or c.get('source',''), c.get('environment', ''),
                     s.get('created', 0), s.get('error', ''), dict(type=kind, id=s['id']), scientific=kind=='nisar')
                 if s['status']=='ready':
                     rows[-1].update(group='attention', status_label='檢查完成，等待確認')
-                rows[-1]['workflow'] = 'NISAR 雙日期' if kind=='nisar' else 'ALOS-4 格式轉換'
+                rows[-1]['workflow'] = {'nisar':'NISAR 雙日期','conversion':'ALOS-4 格式轉換','alos_preparation':'ALOS 批次準備／影格確認'}[kind]
     for s in onboarding.recent():
         label = {'import':'資料整理', 'terrain':'地形準備', 'demo':'合成教學'}.get(s['kind'], s['kind'])
         add('preparation', s['id'], label, s['status'], s.get('stage', ''), created=s.get('created', 0),

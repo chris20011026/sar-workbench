@@ -19,11 +19,12 @@
  const paths=[['reference','較早日期 · NISAR RSLC（.h5）','file'],['secondary','較晚日期 · NISAR RSLC（.h5）','file'],['dem','DEM（具地理參考的單波段 raster）','file'],['water','水體距離圖（選填，二元 0/1 遮罩不適用）','file'],['root','新專案資料夾（選上層後自動建立名稱）','dir']];
  for(const [key,text,mode] of paths){const label=node('label',text),row=node('span',undefined,'input-row'),input=node('input'),button=node('button',mode==='dir'?'選上層資料夾':'選檔案');input.id='nisar_'+key;input.required=key!=='water';button.type='button';action(button,()=>choosePath(mode,p=>{input.value=key==='root'?p+'/nisar-'+new Date().toISOString().replace(/[-:.TZ]/g,'').slice(0,14):p;},input.value||defaults.home));row.append(input,button);label.append(row);$('nisarPaths').append(label);}
  window.openNisarJob=async id=>{selected=id;shownStamp='';await window.openNisar();tab(false);$('nisarDetail').scrollIntoView({behavior:'smooth',block:'start'});};
- window.closeMissions=()=>{panel.hidden=true;$('openMissions').classList.remove('active');if(timer){clearInterval(timer);timer=null;}};
+ window.closeMissions=()=>{panel.hidden=true;window.closeAlosPreparation?.();$('openMissions').classList.remove('active');if(timer){clearInterval(timer);timer=null;}};
  function tab(alos){$('missionTitle').textContent=alos?'ALOS-2／ALOS-4 資料準備':'NISAR 雙日期';$('crumb').textContent='建立專案／'+$('missionTitle').textContent;$('missionAlos').hidden=!alos;$('missionNisar').hidden=alos;$('missionNisarTab').setAttribute('aria-selected',String(!alos));$('missionAlosTab').setAttribute('aria-selected',String(alos));}
- $('missionNisarTab').onclick=()=>tab(false);$('missionAlosTab').onclick=()=>tab(true);
+ $('missionNisarTab').onclick=()=>tab(false);$('missionAlosTab').onclick=()=>window.openAlosPreparation().catch(fail);
  function environments(select,rows,flag){const old=select.value;select.replaceChildren();for(const e of rows.filter(e=>e[flag])){const op=node('option',e.name+' · '+e.path);op.value=e.path;select.append(op);}if([...select.options].some(o=>o.value===old))select.value=old;}
  window.openNisar=async(prefill={})=>{
+  window.closeAlosPreparation?.();
   window.leaveWorkspace?.('newProject');
   current=null;window.closeLibrary?.();$('setup').hidden=true;$('project').hidden=true;$('welcome').hidden=true;panel.hidden=false;$('crumb').textContent='建立專案／NISAR 與 ALOS-4';for(const id of ['newProject','openWelcome'])$(id).classList.remove('active');$('newProject').classList.add('active');clear();
   const [state,data]=await Promise.all([api('/api/state'),api('/api/nisar')]);environments($('nisarEnv'),state.defaults.environments,'isce3');environments($('missionAlosEnv'),state.defaults.environments,'isce');
@@ -74,6 +75,7 @@
   if(s.status==='complete'){box.append(node('p','已完成格式副本；尚未驗證此產品的干涉品質。','notice'));const view=node('button','在資料瀏覽器檢查副本');action(view,()=>window.viewNisarProduct(s.result.output));box.append(view);}
   const details=node('details'),pre=node('pre',s.log||'等待開始');pre.id='conversionLog';details.append(node('summary','轉換日誌'),pre);details.open=s.status==='failed';box.append(details);
  }finally{conversionFetching=false;}}
- window.openAlosPreparation=async(path='',id=null)=>{await window.openNisar();tab(true);if(path)$('missionAlosPath').value=path;if(id){conversionSelected=id;conversionStamp='';}await updateConversions();if(id)$('conversionDetail').scrollIntoView({behavior:'smooth',block:'start'});};
+ window.openAlosLegacyPreparation=async(path='',id=null)=>{await window.openNisar();tab(true);if(path)$('missionAlosPath').value=path;if(id){conversionSelected=id;conversionStamp='';}await updateConversions();if(id)$('conversionDetail').scrollIntoView({behavior:'smooth',block:'start'});};
+ window.openAlosPreparation=async(path='',id=null)=>id||!window.openAlosPreparationWorkspace?window.openAlosLegacyPreparation(path,id):window.openAlosPreparationWorkspace(path);
  $('missionAlosTab').addEventListener('click',()=>updateConversions().catch(fail));setInterval(()=>{if(!panel.hidden&&!$('missionAlos').hidden)updateConversions().catch(e=>{$('conversionNotice').textContent=e.message;});},3000);
 })();

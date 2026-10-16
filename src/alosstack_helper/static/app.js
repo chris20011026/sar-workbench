@@ -38,21 +38,29 @@ function renderProperties(){
 }
 
 async function browse(path){const data=await api('/api/browse?path='+encodeURIComponent(path));$('browsePath').value=data.path;$('up').onclick=()=>browse(data.parent).catch(fail);$('files').replaceChildren();for(const item of data.entries){if(pickMode!=='file'&&!item.dir)continue;const b=node('button',(item.dir?'▸  ':'   ')+item.name,'file');b.onclick=async()=>{if(item.dir){try{await browse(item.path);}catch(e){fail(e);}}else{$('picker').close();try{await pickCallback(item.path);}catch(e){fail(e);}}};$('files').append(b);} }
-let nativePending=false;
+let nativePending=false,nativeFeedback=null;
 async function choosePath(mode,callback,start){
- if(nativePending)return;
+ if(nativePending){const message='正在等候另一個 macOS 選擇視窗。請先完成或取消該視窗，再選擇其他位置。';if(nativeFeedback)nativeFeedback.textContent=message;fail(Error(message));return;}
+ let fallbackMessage='';
  const useNative=localStorage.getItem('alos-picker')!=='web';
  if(useNative){
   nativePending=true;
-  document.querySelectorAll('[data-pick],#importTemplate').forEach(b=>b.disabled=true);
-  $('pickerStatus').textContent='請在 macOS 選擇視窗中選取，或按取消返回。';
+  const buttons=[...document.querySelectorAll('[data-pick],#importTemplate')].map(b=>[b,b.disabled]);buttons.forEach(([b])=>b.disabled=true);
+  nativeFeedback?.remove();nativeFeedback=node('p','正在準備 macOS 選擇視窗（首次使用可能稍久）；請完成選擇或按取消。','hint');nativeFeedback.setAttribute('role','status');nativeFeedback.setAttribute('aria-live','polite');
+  const origin=document.activeElement?.closest('label,.input-row,form,dialog');if(origin)origin.append(nativeFeedback);else document.querySelector('main').prepend(nativeFeedback);
+  $('pickerStatus').textContent=nativeFeedback.textContent;
+  let selectedResult=null;
   try{
-   const result=await api('/api/pick',{mode,start:start||defaults.home});
-   if(result.supported){if(!result.cancelled)await callback(result.path);return;}
-  }catch(e){fail(e);}
-  finally{nativePending=false;document.querySelectorAll('[data-pick],#importTemplate').forEach(b=>b.disabled=false);$('pickerStatus').textContent='';}
+   selectedResult=await api('/api/pick',{mode,start:start||defaults.home});
+   nativeFeedback.textContent=selectedResult.supported?(selectedResult.cancelled?'已取消選擇，原欄位保持不變。':'已選擇位置。'):'目前系統使用網頁內建選擇器。';
+  }catch(e){fallbackMessage=e.message||String(e);nativeFeedback.textContent=fallbackMessage;}
+  finally{nativePending=false;buttons.forEach(([b,disabled])=>b.disabled=disabled);$('pickerStatus').textContent='';}
+  if(selectedResult?.supported){if(!selectedResult.cancelled)await callback(selectedResult.path);return;}
  }
- pickMode=mode;pickCallback=callback;$('chooseDir').hidden=mode==='file';$('files').textContent='正在讀取資料夾…';$('picker').showModal();await browse(start||defaults.home);
+ pickMode=mode;pickCallback=callback;$('chooseDir').hidden=mode==='file';$('files').textContent='正在讀取資料夾…';
+ let notice=$('pickerFallbackNotice');if(!notice){notice=node('p',undefined,'notice');notice.id='pickerFallbackNotice';notice.setAttribute('role','status');$('files').before(notice);}notice.hidden=!fallbackMessage;notice.textContent=fallbackMessage;
+ if(!$('picker').open)$('picker').showModal();
+ try{await browse(start||defaults.home);}catch(e){if(start&&start!==defaults.home){notice.hidden=false;notice.textContent=[fallbackMessage,'先前位置無法讀取，已回到個人資料夾。'].filter(Boolean).join(' ');await browse(defaults.home);}else throw e;}
 }
 $('pickerPreference').value=localStorage.getItem('alos-picker')||'native';
 $('pickerPreference').onchange=()=>localStorage.setItem('alos-picker',$('pickerPreference').value);

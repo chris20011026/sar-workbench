@@ -4,7 +4,7 @@
  const main=document.querySelector('main');
  const dashboard=node('section');dashboard.id='workspaceOverview';dashboard.hidden=true;
  dashboard.innerHTML=`<div class="ws-heading"><div><div class="eyebrow">RESEARCH WORKSPACE</div><h1>研究專案總覽</h1><p class="intro">在同一處查看資料準備、干涉處理與時間序列。選擇工作，接續目前的階段。</p></div><button id="overviewCreate" class="primary">＋ 建立專案</button></div>
- <div id="overviewMetrics" class="ws-metrics"></div><div class="ws-toolbar"><label>搜尋工作<input id="overviewSearch" type="search" placeholder="專案、流程或資料夾"></label><label>狀態<select id="overviewStatus"><option value="">全部狀態</option><option value="running">進行中</option><option value="attention">需要處理</option><option value="ready">等待開始</option><option value="complete">已完成</option><option value="unavailable">離線／位置無法讀取</option></select></label><label>類型<select id="overviewKind"><option value="">全部工作</option><option value="project">ISCE2 專案</option><option value="nisar">NISAR 專案</option><option value="analysis">MintPy／品質報告</option><option value="conversion">格式轉換</option><option value="preparation">資料準備／教學</option></select></label><button id="overviewReload">更新紀錄</button></div><p id="overviewMessage" role="status" class="hint"></p><div id="overviewRecords" class="ws-records"></div>`;
+ <div id="overviewMetrics" class="ws-metrics"></div><div class="ws-toolbar"><label>搜尋工作<input id="overviewSearch" type="search" placeholder="專案、流程或資料夾"></label><label>狀態<select id="overviewStatus"><option value="">全部狀態</option><option value="running">進行中</option><option value="attention">需要處理</option><option value="ready">等待開始</option><option value="complete">已完成</option><option value="unavailable">離線／位置無法讀取</option></select></label><label>類型<select id="overviewKind"><option value="">全部工作</option><option value="project">ISCE2 專案</option><option value="nisar">NISAR 專案</option><option value="analysis">MintPy／品質報告</option><option value="conversion">格式轉換</option><option value="alos_preparation">ALOS 批次準備</option><option value="preparation">資料準備／教學</option></select></label><button id="overviewReload">更新紀錄</button></div><p id="overviewMessage" role="status" class="hint"></p><div id="overviewRecords" class="ws-records"></div>`;
  const chooser=node('section');chooser.id='workspaceCreate';chooser.hidden=true;
  chooser.innerHTML=`<div class="eyebrow">NEW RESEARCH PROJECT</div><h1>從資料選擇合適的流程。</h1><p class="intro">先辨識資料，再選擇研究目標。熟悉資料的使用者，也可以直接選擇下方流程。</p>
  <div class="card ws-source"><div class="card-heading"><span class="number">01</span><div><h2>辨識我的資料 <small>選填</small></h2><p>支援 ALOS、Sentinel-1 IW SLC、NISAR。只讀取描述資料。</p></div></div>
@@ -37,6 +37,7 @@
   else if(a.type==='analysis')await window.openAnalysisRecord(a.id,a.run);
   else if(a.type==='nisar'){await window.openNisarJob(a.id);navState('openOverview');$('crumb').textContent='專案總覽／NISAR 工作';}
   else if(a.type==='conversion'){await window.openAlosPreparation('',a.id);navState('openOverview');$('crumb').textContent='專案總覽／格式轉換工作';}
+  else if(a.type==='alos_preparation'){await window.openAlosPreparationJob(a.id);navState('openOverview');$('crumb').textContent='專案總覽／ALOS 資料準備';}
   else if(a.type==='preparation')await window.openPreparation(a.id);
  }
  function drawRecords(){

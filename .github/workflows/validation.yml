@@ -27,6 +27,8 @@ jobs:
           for source in src/alosstack_helper/static/*.js; do node --check "$source"; done
           node tests/test_ui_resilience.cjs
           node tests/test_comparison_ui.cjs
+          node tests/test_alos_preparation_ui.cjs
+          node tests/test_native_picker_ui.cjs
 
   fresh-mac-install:
     runs-on: macos-14

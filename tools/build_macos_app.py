@@ -28,6 +28,11 @@ def build(output):
     for name in ('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'):
         shutil.copyfile(ROOT / name, payload / name)
     shutil.copytree(ROOT / 'docs', payload / 'docs')
+    # Ship a real LaunchServices application for file dialogs. End users need
+    # neither AppleScript automation permission nor an installed Swift compiler.
+    picker_builder = runpy.run_path(ROOT / 'src/alosstack_helper/native_picker.py')['build_native_helper']
+    picker_builder(payload / 'src/alosstack_helper/resources/SARFilePicker.app',
+                   target='arm64-apple-macos14.5', compiler_cache=output / 'compiler-cache')
     info = dict(CFBundleName='SAR Workbench', CFBundleDisplayName='SAR 研究工作台',
                 CFBundleIdentifier='io.github.chris20011026.sar-workbench',
                 CFBundleExecutable='SARWorkbench', CFBundlePackageType='APPL',

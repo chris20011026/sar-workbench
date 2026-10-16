@@ -1,7 +1,8 @@
 # SAR 研究工作台（SAR Workbench）
 
-本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.8.0 beta 1**，新增成果比較、研究報告、手動成果匯入與 Sentinel-1 驗證紀錄。
+本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.8.0 beta 2**，新增 ALOS 批次資料準備、完整轉換檢查與影格覆蓋確認，並保留成果比較、研究報告與手動成果匯入。
 
+- **[ALOS 批次資料準備](docs/ALOS_PREPARATION.md)**：掃描多日期／影格，勾選 ALOS-4 產品，逐份建立 PALSAR-2 格式副本並檢查完整複數樣本及 ISCE2 讀取；地圖比較兩組影格、保存人工確認。跨衛星干涉仍保留檢查關卡。
 - **[MintPy 成果比較](docs/COMPARISON.md)**：並排地圖、同步縮放、設定差異、有效範圍統計與原生點位曲線。只有格網、參考基準、單位與時間模型等條件相容，才提供 B − A 差值。
 - **[研究報告](docs/RESEARCH_REPORTS.md)**：由已完成分析產生可編輯 Word、可列印網頁、JSON 設定快照與包含圖片的報告包，可附上比較及選定點位曲線。
 - **[匯入手動 ISCE2 成果](docs/LEGACY_IMPORT.md)**：目前限完整、標準目錄的 alosStack 成果；預覽後建立獨立工作資料夾，原始資料唯讀，可接續品質檢查與 MintPy。不是所有 ISCE2 成果的通用匯入器，也不恢復原本 cmd1–4。
@@ -9,7 +10,7 @@
 
 [統一工作空間](docs/WORKSPACE.md)保留影像匯入、外接磁碟重連、[儲存空間統計](docs/STORAGE_USAGE.md)與[安全搬移](docs/PROJECT_MIGRATION.md)。[ALOS-2 影像匯入](docs/IMAGE_IMPORT.md)提供正式中繼資料核對、候選分組、覆蓋地圖與地形範圍帶入。
 
-[NISAR／ALOS-4 實驗流程](docs/MISSION_LAB.md)仍使用獨立的 ISCE3 環境。真實 NISAR RSLC 全流程與混合 ALOS 自動接續尚待驗證，不替代 ISCE2 的 alosStack。
+[NISAR 實驗流程](docs/MISSION_LAB.md)使用獨立的 ISCE3 環境；ALOS 資料準備沿用所選 ISCE2 環境。真實 NISAR RSLC 全流程與混合 ALOS 自動接續尚待驗證，不替代 ISCE2 的 alosStack。
 
 | 工作流 | 狀態 |
 | --- | --- |
@@ -22,7 +23,7 @@
 | NISAR 雙日期（ISCE3） | 實驗功能；獨立環境，未完成真實 RSLC 全流程驗證 |
 | ALOS-4 格式轉換／混合資料健檢 | 實驗功能；不自動接續跨衛星干涉 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.8.0-beta.1) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/tag/v0.8.0-beta.2) 取得 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
 [第一次使用指南](docs/FIRST_USE.md) · [0.8 更新與驗證狀態](docs/RELEASE_0.8.md) · [0.7 版本紀錄](docs/RELEASE_0.7.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
@@ -57,7 +58,7 @@ PYTHONPATH=src python3 -m alosstack_helper.server
 
 瀏覽器會開啟 http://127.0.0.1:8765 。僅供可信任的本機使用者使用，不要代理到網際網路。關閉分頁不會停止後端運算；必須保持伺服器運作。停止工作請用畫面上的按鈕。勿在運算中關閉終端機或讓電腦睡眠。
 
-macOS 上的「選擇」與「匯入 XML 範本」預設開啟系統原生選擇視窗，可使用側邊欄、搜尋、已掛載 NAS，以及 ⌘⇧G 前往路徑。取消不會更改欄位；會從目前欄位附近的資料夾開始。首頁可改選「網頁內建選擇器」，其他系統自動使用內建版本。
+macOS 上的「選擇」與「匯入 XML 範本」預設開啟系統原生選擇視窗，可使用側邊欄、搜尋、已掛載 NAS，以及 ⌘⇧G 前往路徑。取消不會更改欄位；會從目前欄位附近的資料夾開始。首頁可改選「網頁內建選擇器」，其他系統自動使用內建版本。Mac App 已內建原生選檔元件；從原始碼啟動時，首次使用會利用既有 Xcode Command Line Tools 建置暫存元件，沒有工具時會提示改用 Mac App 或網頁選擇器，不會自動安裝開發工具。
 
 ## 處理範圍與資料保護
 
