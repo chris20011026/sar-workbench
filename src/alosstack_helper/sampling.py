@@ -9,6 +9,7 @@ import time
 READ_PHASE = 'cmd1 · 讀取資料'
 PLAN_PHASE = 'cmd1 · 檢查取樣與影格'
 APPLY_PHASE = 'cmd1 · 統一取樣'
+MATCH_PHASE = 'cmd1 · 對位與幾何'
 
 
 def selected_frames(config):
@@ -106,22 +107,61 @@ def approve(state, options, proc):
     state['sampling_approval'] = approval
 
 
+def completion(state, proc):
+    """Bind a completed transaction to this project's reviewed plan.
+
+    The worker's ``verify`` also inspects the actual current SLCs and metadata.
+    This lightweight check is used before accepting a new matching action, then
+    again within the worker; a status label alone never authorizes matching.
+    """
+    try:
+        report = json.loads((proc/'helper_sampling_plan.json').read_text())
+        approved = json.loads((proc/'helper_sampling_approval.json').read_text())
+        receipt = json.loads((proc/'helper_sampling/receipt.json').read_text())
+    except (OSError, ValueError):
+        raise ValueError('缺少有效的取樣完成與人工確認紀錄，不能開始影像匹配。') from None
+    if (not isinstance(report, dict) or not isinstance(approved, dict) or not isinstance(receipt, dict)
+            or report != state.get('sampling') or not report.get('plan_id')
+            or approved != state.get('sampling_approval') or approved.get('frames_verified') is not True
+            or approved.get('plan_id') != report['plan_id']
+            or receipt.get('frames') != approved or receipt.get('plan_id') != report['plan_id']):
+        raise ValueError('取樣完成紀錄與當次計畫或人工確認不一致，不能開始影像匹配。')
+    post = receipt.get('post')
+    if not isinstance(post, dict) or type(post.get('changed')) is not int or post['changed'] != 0:
+        raise ValueError('取樣後檢查尚未通過，不能開始影像匹配。')
+    return post
+
+
 def before_matching(engine, state, proc):
-    """False means waiting for a human; no matching command has run."""
+    """Stop independently at frame review and at verified sampling completion."""
+    # Explicit matching and recovery at matching/later stages must skip the two
+    # earlier gates. Older snapshots use the same phase names and remain valid.
+    resume_later = engine.resume_phase is not None and engine.resume_phase not in (
+        READ_PHASE, PLAN_PHASE, APPLY_PHASE)
     engine.checkpoint(state, READ_PHASE, lambda: invoke(engine, state, 'read'))
     def plan():
         invoke(engine, state, 'plan')
         state['sampling'] = json.loads((proc/'helper_sampling_plan.json').read_text())
         state.pop('sampling_approval', None)
+        state.pop('sampling_result', None)
+        state.pop('sampling_match_approval', None)
     engine.checkpoint(state, PLAN_PHASE, plan)
     # A restored phase after equalization retains its confirmed state. Never
     # rerun read_data or resampling just because the page/server was restarted.
     if not state.get('sampling_approval'):
         state.update(status='sampling_review', stage='等待人工確認影格對應與取樣差異')
         return False
-    engine.checkpoint(state, APPLY_PHASE, lambda: invoke(engine, state, 'apply'))
+    def equalize():
+        invoke(engine, state, 'apply')
+        invoke(engine, state, 'verify')
+        state['sampling_result'] = completion(state, proc)
+    engine.checkpoint(state, APPLY_PHASE, equalize)
+    if not resume_later:
+        state.update(status='sampling_ready', stage='取樣統一已完成，請檢查成果後再開始影像匹配')
+        return False
     def match():
         invoke(engine, state, 'verify')
+        state['sampling_result'] = completion(state, proc)
         engine.shell(state, proc/'helper_cmd1_after_read.sh')
-    engine.checkpoint(state, 'cmd1 · 對位與幾何', match)
+    engine.checkpoint(state, MATCH_PHASE, match)
     return True

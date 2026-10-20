@@ -7,6 +7,7 @@ import unittest
 from unittest.mock import patch
 
 import test_workflow
+from alosstack_helper import sampling
 from alosstack_helper.core import atomic_json, digest
 from alosstack_helper.recovery import Recovery, process_alive
 
@@ -61,6 +62,68 @@ class RecoveryTests(unittest.TestCase):
         archive=Path(self.s['recovery_attempt'])/'failed-proc'
         self.assertEqual((archive/'partial').read_text(),'broken')
         self.assertEqual(len([h for h in self.s['history'] if h['stage']=='cmd1 · 對位與幾何']),1)
+
+    def sampling_plan(self):
+        self.s['config']['sampling_equalization']=True
+        self.s['sampling']={'plan_id':'reviewed-original-inputs','rows':[]}
+        proc=self.root/'proc'
+        atomic_json(proc/'helper_sampling_plan.json',self.s['sampling'])
+        sampling.approve(self.s,dict(plan_id=self.s['sampling']['plan_id'],
+                         frames_verified=True,frame_notes='人工確認對應範圍'),proc)
+        (proc/'helper_cmd1_after_read.sh').write_text('#!/bin/bash\ntrue\n')
+        self.s['hashes']['helper_cmd1_after_read.sh']=digest(proc/'helper_cmd1_after_read.sh')
+        self.e.save(self.s)
+
+    def sampling_receipt(self,s):
+        atomic_json(self.root/'proc/helper_sampling/receipt.json',dict(
+            plan_id=s['sampling']['plan_id'],frames=s['sampling_approval'],
+            post={'plan_id':'equalized-inputs','changed':0,'rows':[]}))
+
+    def test_failed_sampling_recovery_stops_ready_without_automatic_matching(self):
+        self.sampling_plan();self.e.resume_phase=sampling.APPLY_PHASE
+        calls=[];fail=True
+        def invoke(e,s,mode):
+            nonlocal fail
+            calls.append(mode)
+            if mode=='apply':
+                partial=self.root/'proc/partial-sampling'
+                if fail:
+                    fail=False;partial.write_text('incomplete');raise RuntimeError('synthetic interruption')
+                self.assertFalse(partial.exists())
+                self.sampling_receipt(s)
+        with patch('alosstack_helper.sampling.invoke',side_effect=invoke),patch.object(self.e,'shell') as shell:
+            self.e.worker(self.s,'run')
+            self.assertEqual(self.e.get('test')['status'],'failed')
+            self.assertEqual(self.e.get('test')['recovery']['phase'],sampling.APPLY_PHASE)
+            self.resume()
+        shell.assert_not_called()
+        self.assertEqual(calls,['apply','apply','verify'])
+        self.assertEqual(self.s['status'],'sampling_ready')
+        self.assertTrue(self.s['sampling_approval']['frames_verified'])
+        self.assertEqual(self.s['sampling_result']['changed'],0)
+        archive=Path(self.s['recovery_attempt'])/'failed-proc/partial-sampling'
+        self.assertEqual(archive.read_text(),'incomplete')
+
+    def test_matching_recovery_preserves_old_snapshot_contract_and_skips_sampling(self):
+        self.sampling_plan();self.sampling_receipt(self.s)
+        # Existing snapshots predate the new separate matching-review action.
+        self.assertNotIn('sampling_match_approval',self.s)
+        self.e.resume_phase=sampling.MATCH_PHASE
+        calls=[];fail=True
+        def shell(s,path):
+            nonlocal fail
+            calls.append(path.name)
+            if path.name=='helper_cmd1_after_read.sh' and fail:
+                fail=False;raise RuntimeError('matching failed')
+        self.e.shell=shell
+        with patch('alosstack_helper.sampling.invoke') as invoke:
+            self.e.worker(self.s,'run')
+            self.assertEqual(self.e.get('test')['recovery']['phase'],sampling.MATCH_PHASE)
+            self.resume()
+        self.assertEqual([call.args[-1] for call in invoke.call_args_list],['verify','verify'])
+        self.assertEqual(calls,['helper_cmd1_after_read.sh','helper_cmd1_after_read.sh','cmd_2.sh','helper_cmd3_before_review.sh'])
+        self.assertEqual(self.s['status'],'review')
+        self.assertEqual(len([h for h in self.s['history'] if h['stage']==sampling.MATCH_PHASE]),1)
 
     def test_ion_correction_is_not_applied_twice(self):
         phase=self.root/'proc/phase.txt';phase.write_text('0');calls=[];fail=True

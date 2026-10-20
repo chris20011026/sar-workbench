@@ -386,6 +386,19 @@ class Engine:
                 self.resume_phase = sampling.APPLY_PHASE
                 action = 'run'
                 expected['run'] = 'sampling_review'
+            elif action == 'sampling_match':
+                if s['status'] != 'sampling_ready' or not s['config'].get('sampling_equalization'):
+                    raise ValueError('請先完成影格人工確認與取樣統一，再檢查成果。')
+                if not options or options.get('sampling_reviewed') is not True:
+                    raise ValueError('請先檢查取樣後成果並勾選確認，再開始影像匹配。')
+                self.verify_commands(s)
+                sampling.completion(s, self.paths(s)[1])
+                s['sampling_match_approval'] = dict(
+                    plan_id=s['sampling']['plan_id'], sampling_reviewed=True,
+                    time=time.strftime('%Y-%m-%d %H:%M:%S'))
+                self.resume_phase = sampling.MATCH_PHASE
+                action = 'run'
+                expected['run'] = 'sampling_ready'
             retry_prepare = action == 'prepare' and self.can_retry_prepare(s)
             if s['status'] != expected.get(action) and not retry_prepare:
                 raise ValueError('目前階段不允許這個操作。')
@@ -419,7 +432,7 @@ class Engine:
         with self.lock:
             s=self.require_processing_location(key)
             if self.active or process_alive(self.paths(s)[2]): raise ValueError('運算中不能變更復原保護。')
-            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review','sampling_review'):
+            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review','sampling_review','sampling_ready'):
                 raise ValueError('只能在多日期運算開始前或人工判讀時變更後續保護。')
             s['recovery_enabled']=bool(enabled); self.save(s)
 

@@ -77,11 +77,22 @@ class SamplingTests(unittest.TestCase):
         atomic_json(self.proc/'helper_sampling_plan.json', report)
         return report
 
-    def test_engine_stops_after_read_before_any_matching_then_continues_once(self):
+    def receipt(self):
+        post={'plan_id':'equalized-inputs','changed':0,'rows':[]}
+        atomic_json(self.proc/'helper_sampling/receipt.json',
+                    dict(plan_id='bound-to-inputs',post=post,frames=self.state['sampling_approval']))
+        return post
+
+    def approve(self):
+        self.state['sampling']=self.plan()
+        sampling.approve(self.state,dict(plan_id='bound-to-inputs',frames_verified=True,frame_notes='確認測試'),self.proc)
+
+    def test_engine_stops_after_read_and_after_sampling_then_explicit_matching(self):
         calls=[]
         def invoke(e,s,mode):
             calls.append(mode)
             if mode=='plan': self.plan()
+            if mode=='apply': self.receipt()
         self.engine.shell=lambda s,p:calls.append(p.name)
         product=self.proc/'pairs/240822-250425/out.unw.geo'; product.parent.mkdir(parents=True);product.write_bytes(b'ok')
         with patch('alosstack_helper.sampling.invoke',side_effect=invoke):
@@ -95,12 +106,74 @@ class SamplingTests(unittest.TestCase):
                 self.engine.launch('sampling','sampling_continue',options=opts)
             self.state=self.engine.get('sampling')
             self.engine.worker(self.state,'run')
-        self.assertEqual(calls,['read','plan','apply','verify','helper_cmd1_after_read.sh','cmd_2.sh','cmd_4.sh'])
+            self.assertEqual(calls,['read','plan','apply','verify'])
+            self.assertEqual(self.state['status'],'sampling_ready')
+            self.assertEqual(self.state['sampling_result']['plan_id'],'equalized-inputs')
+            self.assertNotIn(sampling.MATCH_PHASE,[h['stage'] for h in self.state['history']])
+            with self.assertRaises(ValueError): self.engine.launch('sampling','run')
+            with self.assertRaises(ValueError): self.engine.launch('sampling','sampling_continue',options=opts)
+            with self.assertRaisesRegex(ValueError,'勾選確認'): self.engine.launch('sampling','sampling_match')
+            with patch('alosstack_helper.engine.threading.Thread'):
+                self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
+            self.state=self.engine.get('sampling')
+            self.engine.worker(self.state,'run')
+        self.assertEqual(calls,['read','plan','apply','verify','verify','helper_cmd1_after_read.sh','cmd_2.sh','cmd_4.sh'])
         self.assertEqual(self.state['status'],'complete')
+        self.assertTrue(self.state['sampling_match_approval']['sampling_reviewed'])
+
+    def test_matching_requires_ready_even_with_completed_receipt(self):
+        self.approve();self.receipt()
+        for status in ('ready','sampling_review','failed','complete'):
+            self.state['status']=status;self.engine.save(self.state)
+            with self.subTest(status=status),self.assertRaisesRegex(ValueError,'先完成'):
+                self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
+        self.state['status']='sampling_ready';self.state['config']['sampling_equalization']=False
+        self.engine.save(self.state)
+        with self.assertRaisesRegex(ValueError,'先完成'):
+            self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
+
+    def test_missing_or_changed_receipt_blocks_matching_launch(self):
+        self.approve();self.state['status']='sampling_ready';self.engine.save(self.state)
+        with self.assertRaisesRegex(ValueError,'缺少有效'):
+            self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
+        self.receipt()
+        path=self.proc/'helper_sampling/receipt.json';original=json.loads(path.read_text())
+        for change in ({'plan_id':'different'},{'frames':{}},{'post':{'changed':1}}, {'post':{}}):
+            atomic_json(path,{**original,**change})
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
+            self.assertIsNone(self.engine.active)
+        atomic_json(path,original)
+        atomic_json(self.proc/'helper_sampling_plan.json',{'plan_id':'changed'})
+        with self.assertRaisesRegex(ValueError,'當次計畫'):
+            self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
+
+    def test_matching_rechecks_current_outputs_after_ready_and_before_shell(self):
+        self.approve();self.receipt();self.state['status']='sampling_ready';self.engine.save(self.state)
+        with patch('alosstack_helper.engine.threading.Thread'):
+            self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
+        self.state=self.engine.get('sampling')
+        with patch('alosstack_helper.sampling.invoke',side_effect=ValueError('SLC 已變更')) as invoke, \
+             patch.object(self.engine,'shell') as shell:
+            self.engine.worker(self.state,'run')
+        self.assertEqual([call.args[-1] for call in invoke.call_args_list],['verify'])
+        shell.assert_not_called()
+        self.assertEqual(self.state['status'],'failed')
+        self.assertEqual(self.state['failed_phase'],sampling.MATCH_PHASE)
+
+    def test_sampling_verification_failure_never_marks_ready_or_starts_matching(self):
+        self.approve();self.engine.resume_phase=sampling.APPLY_PHASE
+        def invoke(e,s,mode):
+            if mode=='apply':self.receipt()
+            if mode=='verify':raise ValueError('SLC 尺寸不符')
+        with patch('alosstack_helper.sampling.invoke',side_effect=invoke),patch.object(self.engine,'shell') as shell:
+            self.engine.worker(self.state,'run')
+        shell.assert_not_called()
+        self.assertEqual(self.state['status'],'failed')
+        self.assertNotIn('sampling_result',self.state)
 
     def test_sampling_failure_blocks_matching_and_preserves_consent(self):
-        self.state['sampling']=self.plan()
-        sampling.approve(self.state,dict(plan_id='bound-to-inputs',frames_verified=True,frame_notes='確認測試'),self.proc)
+        self.approve()
         self.engine.resume_phase=sampling.APPLY_PHASE
         with patch('alosstack_helper.sampling.invoke',side_effect=RuntimeError('interrupted')), patch.object(self.engine,'shell') as shell:
             self.engine.worker(self.state,'run');shell.assert_not_called()
