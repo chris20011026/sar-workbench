@@ -199,8 +199,6 @@ def product_metadata(entries):
 
 
 def summarize(products, allow_cross_sensor=False):
-    from shapely.geometry import shape, mapping
-    from shapely.ops import unary_union
     errors, warnings = [], []
     groups = {}
     for product in products:
@@ -227,6 +225,8 @@ def summarize(products, allow_cross_sensor=False):
     complete = bool(products) and all(p['footprint'] and not p['errors'] for p in products)
     union, common, bounds = None, None, None
     if complete:
+        from shapely.geometry import shape, mapping
+        from shapely.ops import unary_union
         per_day = [unary_union([shape(p['footprint']) for p in rows]) for rows in days.values()]
         all_area = unary_union(per_day)
         union = mapping(all_area)
