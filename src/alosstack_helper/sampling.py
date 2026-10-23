@@ -145,6 +145,8 @@ def before_matching(engine, state, proc):
         state.pop('sampling_approval', None)
         state.pop('sampling_result', None)
         state.pop('sampling_match_approval', None)
+        state.pop('matching_quality', None)
+        state.pop('matching_approval', None)
     engine.checkpoint(state, PLAN_PHASE, plan)
     # A restored phase after equalization retains its confirmed state. Never
     # rerun read_data or resampling just because the page/server was restarted.
@@ -160,8 +162,19 @@ def before_matching(engine, state, proc):
         state.update(status='sampling_ready', stage='取樣統一已完成，請檢查成果後再開始影像匹配')
         return False
     def match():
+        from . import matching_quality
         invoke(engine, state, 'verify')
         state['sampling_result'] = completion(state, proc)
         engine.shell(state, proc/'helper_cmd1_after_read.sh')
+        matching_quality.publish(state, proc)
     engine.checkpoint(state, MATCH_PHASE, match)
+    # Matching is now a separate operation. Newly generated reports always
+    # stop here, including recovery of a failed matching phase. Older snapshots
+    # already beyond cmd1 retain their legacy continuation semantics.
+    if state.get('matching_quality'):
+        from . import matching_quality
+        if not state.get('matching_approval'):
+            state.update(status='matching_review', stage='影像匹配已完成，等待匹配品質人工確認')
+            return False
+        matching_quality.verified_approval(state, proc)
     return True

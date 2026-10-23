@@ -211,7 +211,7 @@ def make_server(engine, port=8765):
                         '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
                         '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach', '/api/storage-usage-start',
                         '/api/migration-plan', '/api/migration-copy', '/api/migration-switch', '/api/migration-abandon',
-                        '/api/alos-preparation-coverage', '/api/sampling-review', '/api/sampling-preview') + migration_writes
+                        '/api/alos-preparation-coverage', '/api/sampling-review', '/api/sampling-preview', '/api/matching-review') + migration_writes
             if self.path in launches:
                 with operation_lock: self.handle_post()
             else: self.handle_post()  # Stop and the native picker remain outside this lock.
@@ -221,11 +221,13 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
-                if self.path in ('/api/sampling-review', '/api/sampling-preview'):
+                if self.path in ('/api/sampling-review', '/api/sampling-preview', '/api/matching-review'):
                     if engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or onboarding.runtime.status().get('status') == 'running' or any(j['status'] == 'running' for j in onboarding.jobs.values()):
                         raise ValueError('請等待目前運算、安裝或搬移結束，再載入影格預覽。')
                     if self.path == '/api/sampling-review':
                         return self.send(sampling_reviews.review(d['id'], d.get('extra_source')))
+                    if self.path == '/api/matching-review':
+                        return self.send(engine.refresh_matching_quality(d['id']))
                     return self.send(sampling_reviews.preview(d['id'], d['image_id'], d['plan_id']))
                 if self.path in migration_writes and migrations.busy():
                     raise ValueError('專案安全搬移進行中，請先完成或暫停搬移，再更改資料或啟動運算。')
@@ -370,10 +372,10 @@ def make_server(engine, port=8765):
                     if s['config'].get('workflow')=='topsApp':
                         TopsWorkflow(engine).verify(s)
                         engine.launch(d['id'],d['action'],options=d);return self.send({'ok':True})
-                    if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover', 'sampling_continue', 'sampling_match'):
+                    if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover', 'sampling_continue', 'sampling_match', 'matching_continue'):
                         report = require_preflight(s['config'], existing=True)
                         atomic_json(engine.paths(s)[2]/'preflight.json', report)
-                    if d['action'] in ('prepare','run','sampling_continue','sampling_match'):
+                    if d['action'] in ('prepare','run','sampling_continue','sampling_match','matching_continue'):
                         verify_saved_inputs(s,engine.paths(s)[2])
                     engine.launch(d['id'],d['action'],d.get('excluded'),d); return self.send({'ok':True})
                 if self.path == '/api/stop': engine.stop(); return self.send({'ok':True})

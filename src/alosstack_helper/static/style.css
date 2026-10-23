@@ -60,3 +60,5 @@
 .mission-table table{width:100%;border-collapse:collapse;white-space:nowrap}
 .mission-table th,.mission-table td{text-align:left;padding:10px;border-bottom:1px solid #dce4db}
 @media(max-width:600px){#missionsPanel .input-row{flex-wrap:wrap}#missionsPanel .input-row input{flex-basis:100%}#missionsPanel .summary{grid-template-columns:1fr}#missionsPanel .summary dd{margin:0 0 10px}}
+
+.help-dialog{width:min(780px,calc(100vw - 36px));max-height:86vh;overflow:auto;box-sizing:border-box;padding:28px;color:var(--ink,#203c37);border:1px solid #d4dfd3;border-radius:16px}.help-dialog::backdrop{background:rgba(15,35,28,.4)}.help-dialog h2{margin:0}.help-dialog .card-heading{gap:16px;align-items:start}.help-dialog .card-heading button{flex-shrink:0}.help-dialog details{padding:17px 0;border-bottom:1px solid #dce3da}.help-dialog summary{font-weight:650;cursor:pointer;line-height:1.8}.help-dialog p,.help-dialog li{font-size:14px;line-height:1.9}.help-dialog a{color:#285a47;line-height:2}.help-dialog .inline{flex-wrap:wrap;gap:20px}@media(max-width:580px){.help-dialog{padding:18px}.help-dialog h2{font-size:20px}}

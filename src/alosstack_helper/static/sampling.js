@@ -21,6 +21,7 @@
  panel.innerHTML=`<div class="card-heading"><div><p class="eyebrow">FRAME REVIEW · SAMPLING</p><h2>先看影像，再決定下一步</h2></div><span class="badge" id="samplingBadge"></span></div>
  <ol class="sampling-steps" aria-label="影格與取樣進度"><li id="samplingStepRead"><span>01</span>讀取資料</li><li id="samplingStepReview"><span>02</span>核對影格</li><li id="samplingStepSample"><span>03</span>統一取樣</li><li id="samplingStepMatch"><span>04</span>確認後匹配</li></ol>
  <p id="samplingSummary" class="notice"></p>
+ <section class="sampling-section" aria-labelledby="samplingCompatibilityTitle"><div class="sampling-section-heading"><div><p class="eyebrow">SENSOR COMPATIBILITY</p><h3 id="samplingCompatibilityTitle">取樣相同之外，還有哪些差異？</h3><p class="hint">只比較本次處理影格。候選影格不會影響這份相容性摘要。</p></div><span class="badge">中繼資料檢查 · 仍須判讀</span></div><p id="samplingCompatibilityStatus" class="hint" role="status">載入影格清單後顯示；不會替你通過人工確認。</p><div id="samplingCompatibilityChecks" class="compatibility-checks"></div><div id="samplingCompatibilityWarnings" class="sampling-warnings"></div><details class="sampling-inventory"><summary>查看波長、頻寬與 Doppler 資料</summary><div class="sampling-table"><table><thead><tr><th>日期／影格／衛星</th><th>波長（m）</th><th>名目距離頻寬（MHz）</th><th>處理器記錄頻寬（MHz）</th><th>Doppler 常數（Hz）</th><th>Doppler 一次項（Hz/km）</th></tr></thead><tbody id="samplingCompatibilityRows"></tbody></table></div><p class="sampling-caveat">Doppler 欄位為中繼資料多項式係數，不是影像中心位置的頻率。表中未知值不以 0 取代；相同取樣率也不代表兩個衛星的頻帶已匹配。</p><div id="samplingCompatibilitySources"></div></details></section>
  <section class="sampling-section" aria-labelledby="samplingMapTitle"><div class="sampling-section-heading"><div><p class="eyebrow">01 / COVERAGE</p><h3 id="samplingMapTitle">這些影像涵蓋同一個地方嗎？</h3><p class="hint">用影像外框核對位置；實線為本次讀取的影格，虛線為候選影格。</p></div><button id="samplingLoadReview">更新影格地圖與清單</button></div>
  <details class="sampling-extra"><summary>加入其他影格一起比較（選用）</summary><label for="samplingExtraSource">候選影格資料夾（只讀）</label><div class="input-row"><input id="samplingExtraSource" placeholder="例如：包含 0480、0490 的原始資料夾"><button id="samplingPickExtra" type="button">選擇資料夾</button></div><p class="hint">只加入比較清單，不會改動來源或本次處理影格。選好後按「更新影格地圖與清單」。</p></details>
  <p id="samplingReviewStatus" class="hint" role="status" aria-live="polite">準備讀取影格外框與預覽清單…</p>
@@ -36,13 +37,17 @@
  <p class="sampling-caveat">預覽是降採樣的雷達座標影像，向上不代表北方，兩張圖也尚未對位。各影像分別拉伸亮度，不能直接比較輻射強度；此處不將 SLC 疊在地圖上。</p></section>
  <details class="sampling-numbers"><summary>查看取樣率、尺寸與預計空間</summary><div class="sampling-table"><table><thead><tr><th>日期／影格</th><th>輸入方式</th><th>距離取樣率 RSR（MHz）</th><th>方位向 PRF（Hz）</th><th>尺寸（寬 × 高）</th><th>處理</th></tr></thead><tbody id="samplingRows"></tbody></table></div><p class="hint">箭頭表示輸入值 → 參考日期的目標值。統一取樣間距後，仍須匹配與品質檢查。這項跨衛星流程尚未通過完整真實影像驗證。</p><details><summary>查看各影像來源</summary><div id="samplingSources"></div></details></details>
  <div id="samplingApproval" class="sampling-decision"><p class="eyebrow">03 / YOUR DECISION</p><h3>確認影格後，只執行取樣統一</h3><label for="samplingNotes">影格對應的確認依據</label><textarea id="samplingNotes" rows="3" maxlength="2000" placeholder="例如：已比對各日期的影像外框與軌道，並依課程確認使用 0480；有無拼接及排除的影格…"></textarea><label class="check"><input id="samplingConsent" type="checkbox">我已人工核對各日期與參考日期的影格地理對應，確認可以統一取樣。</label><p class="hint">尚未確定時，保留在此關卡即可。執行後會停在成果檢查，等待你另行啟動影像匹配。原始 SLC／描述檔保留在專案內。</p><button id="samplingContinue" class="primary" disabled>確認影格，僅統一取樣</button></div>
- <div id="samplingMatchApproval" class="sampling-decision" hidden><p class="eyebrow">04 / REVIEW BEFORE MATCHING</p><h3>取樣已統一，先檢查成果</h3><p class="hint">比較上方「統一取樣後」與「原始輸入」預覽，並核對取樣率與尺寸。影像匹配及後續流程尚未開始。</p><label class="check"><input id="samplingMatchConsent" type="checkbox">我已檢查取樣成果與預覽，確認要啟動影像匹配及後續流程。</label><button id="samplingMatch" class="primary" disabled>開始影像匹配與後續流程</button></div><p id="samplingConfirmed" class="hint"></p>`;
+ <div id="samplingMatchApproval" class="sampling-decision" hidden><p class="eyebrow">04 / REVIEW BEFORE MATCHING</p><h3>取樣已統一，先檢查成果</h3><p class="hint">比較上方「統一取樣後」與「原始輸入」預覽，並核對取樣率、尺寸及相容性資訊。接下來只執行匹配與幾何步驟，結束後會停在匹配品質檢查。</p><label class="check"><input id="samplingMatchConsent" type="checkbox">我已檢查取樣成果、預覽與相容性資訊，確認要開始影像匹配。</label><button id="samplingMatch" class="primary" disabled>開始匹配，完成後先檢查品質</button></div><p id="samplingConfirmed" class="hint"></p>`;
  $('project').querySelector('.card').after(panel);
+ const qualityPanel=node('section',undefined,'card sampling-review');qualityPanel.id='matchingQuality';qualityPanel.hidden=true;
+ qualityPanel.innerHTML=`<div class="card-heading"><div><p class="eyebrow">MATCHING QUALITY</p><h2>匹配完成，先檢查對位證據</h2></div><span class="badge" id="matchingBadge"></span></div><p id="matchingSummary" class="notice"></p><div id="matchingMetrics" class="compatibility-checks"></div><div id="matchingWarnings" class="sampling-warnings"></div><div class="sampling-section-heading"><h3>各日期與影格的匹配紀錄</h3><button id="matchingRefresh" type="button">更新品質檢查</button></div><p id="matchingRefreshStatus" class="hint" role="status"></p><div class="sampling-table"><table><thead><tr><th>日期／影格</th><th>證據類型</th><th>輸入 → 保留點數</th><th>剔除比例</th><th>距離偏移（像素）</th><th>方位偏移（像素）</th><th>診斷擬合殘差 RMS（像素）</th></tr></thead><tbody id="matchingRows"></tbody></table></div><p class="sampling-caveat">偏移顯示最小／中位／最大值；偏移量大不等於對位失敗。診斷殘差來自工作台另外擬合的仿射模型，不是 ISCE2 的內部擬合誤差，也不能單獨證明配準正確。幾何偏移或未知來源不會顯示成實測相關匹配。</p><details id="matchingPlotDetails" class="sampling-inventory"><summary>查看匹配點位置與偏移分布</summary><div class="sampling-map-tools"><label for="matchingPlotRow">日期與影格<select id="matchingPlotRow"></select></label><label for="matchingPlotAxis">顏色代表的偏移<select id="matchingPlotAxis"><option value="range">距離向偏移（像素）</option><option value="azimuth">方位向偏移（像素）</option></select></label></div><p id="matchingPlotStatus" class="hint" role="status"></p><div id="matchingPlot" class="matching-plot" aria-label="匹配點位置與偏移散點圖"></div><p class="sampling-caveat">每個影格最多顯示 100 個保留點的等間隔抽樣；上表統計使用全部保留點。座標為參考影像像素，向上不代表北方。顏色表示偏移，不是地表位移。</p></details><p class="hint">表格可左右捲動，查看所有欄位。</p><div id="matchingDecision" class="sampling-decision"><h3>確認後，再開始干涉處理</h3><label for="matchingNotes">判讀與繼續處理的依據</label><textarea id="matchingNotes" rows="3" maxlength="2000" placeholder="記錄已核對的匹配點、偏移分布，以及仍需追蹤的問題…"></textarea><label class="check"><input id="matchingConsent" type="checkbox">我已檢查匹配證據及限制，確認接續干涉處理。</label><p id="matchingDecisionHint" class="hint"></p><button id="matchingContinue" class="primary" disabled>確認匹配品質，開始干涉處理</button></div><p id="matchingConfirmed" class="hint"></p>`;
+ $('project').querySelector('.card').after(qualityPanel);
  let state=null,visualKey=null,review=null,reviewAttempted=false,requestSerial=0,reviewPending=false,previewPending=false,transitionPending=false;
+ let matchingKey=null,matchingPending=false,matchingPlotSignature=null;
  let map=null,mapLayers=[],commonLayer=null,tiles=null,allBounds=null,images=new Map();
  const palette=['#277a66','#ad5d2f','#526cb3','#985b96','#7d8032','#278b9d','#a94e64','#6760a5'];
  const panes=['Left','Right'],objectURLs={Left:null,Right:null},visibleDates=new Map(),visibleFrames=new Map();
- const shortDate=d=>/^\d{6}$/.test(d||'')?`20${d.slice(0,2)}-${d.slice(2,4)}-${d.slice(4,6)}`:String(d||'日期未確認');
+ const shortDate=d=>/^\d{6}$/.test(d||'')?`20${d.slice(0,2)}-${d.slice(2,4)}-${d.slice(4,6)}`:/^\d{8}$/.test(d||'')?`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}`:String(d||'日期未確認');
  const safe=()=>!window.workbenchState?.busy&&!state?.storage?.relocated&&!state?.storage?.inputs_missing;
  const inspectable=()=>safe()&&['sampling_review','sampling_ready'].includes(state?.status)&&!transitionPending;
  const localPending=()=>reviewPending||previewPending||transitionPending;
@@ -52,6 +57,52 @@
   $('samplingContinue').disabled=!canProceed();$('samplingMatch').disabled=!canMatch();
   $('samplingLoadReview').disabled=!inspectable()||localPending();$('samplingPickExtra').disabled=!inspectable()||localPending();$('samplingExtraSource').disabled=!inspectable()||localPending();
   for(const side of panes){const select=$(`samplingPreview${side}Select`);select.disabled=!inspectable()||localPending()||!images.size;$(`samplingPreview${side}Load`).disabled=select.disabled||!images.has(select.value);}
+  const quality=state?.matching_quality,reviewing=state?.status==='matching_review';
+  $('matchingContinue').disabled=!(reviewing&&safe()&&!matchingPending&&!localPending()&&quality?.can_continue===true&&$('matchingConsent').checked&&$('matchingNotes').value.trim().length>=3);
+  $('matchingRefresh').disabled=!reviewing||!safe()||matchingPending||localPending();
+  $('matchingNotes').disabled=$('matchingConsent').disabled=!reviewing||matchingPending;
+ }
+ const measurement=(value,scale=1,digits=3)=>typeof value==='number'&&Number.isFinite(value)?(value/scale).toFixed(digits):'未知';
+ function renderCompatibility(data){
+  const report=data?.compatibility;$('samplingCompatibilityChecks').replaceChildren();$('samplingCompatibilityWarnings').replaceChildren();$('samplingCompatibilityRows').replaceChildren();$('samplingCompatibilitySources').replaceChildren();
+  if(!report){$('samplingCompatibilityStatus').textContent='尚未取得相容性資料。請更新影格地圖與清單；這不代表已相容。';return;}
+  $('samplingCompatibilityStatus').textContent=report.note||'已整理本次處理影格的中繼資料；實際頻帶濾波及跨衛星科學品質尚未驗證。';
+  const labels={same:'記錄值一致',different:'記錄值有差異',unknown:'尚待確認'};
+  for(const check of report.checks||[]){const box=node('div',undefined,'compatibility-check');box.append(node('small',check.label||'檢查項目'),node('strong',labels[check.status]||'尚待確認'),node('p',check.detail||'尚無完整資訊','hint'));$('samplingCompatibilityChecks').append(box);}
+  const overlap=report.range_overlap||{},detail=node('div',undefined,'compatibility-check');detail.append(node('small','名目距離共同頻帶'),node('strong',overlap.status==='nominal_overlap'?measurement(overlap.bandwidth_hz,1e6)+' MHz':overlap.status==='no_nominal_overlap'?'未找到名目交集':'尚無法估計'),node('p',overlap.reason||overlap.method||'需要有效的波長與頻寬資料。','hint'));$('samplingCompatibilityChecks').append(detail);
+  for(const warning of report.warnings||[])$('samplingCompatibilityWarnings').append(node('p',String(warning),'sampling-warning'));
+  for(const row of report.rows||[]){const tr=node('tr');for(const value of [`${shortDate(row.date)} / ${row.frame||'未知'} / ${row.sensor||'未知'}`,measurement(row.wavelength_m,1,6),measurement(row.range_bandwidth_hz,1e6),measurement(row.processor_range_bandwidth_hz,1e6),measurement(row.doppler?.constant_hz),measurement(row.doppler?.linear_hz_per_km)])tr.append(node('td',value));$('samplingCompatibilityRows').append(tr);
+   const details=node('details',undefined,'compatibility-source');details.append(node('summary',`${shortDate(row.date)} · ${row.frame||'未知'}：資料來源與提醒`));if(row.doppler?.equation)details.append(node('p',row.doppler.equation,'hint'));
+   const names={wavelength_m:'波長',carrier_frequency_hz:'中心頻率',range_bandwidth_hz:'名目距離頻寬',processor_range_bandwidth_hz:'處理器頻寬',azimuth_bandwidth_hz:'方位頻寬',range_sampling_hz:'距離取樣率',prf_hz:'PRF',doppler:'Doppler 係數',doppler_constant_hz:'Doppler 常數',doppler_linear_hz_per_km:'Doppler 一次項',chirp_rate_hz_per_s:'線性調頻率',pulse_length_us:'脈衝長度',processor_range_bandwidth_khz:'原始處理器頻寬',pulse_code:'脈衝編碼',range_sampling_mhz:'原始距離取樣率',prf_millihz:'原始 PRF'};
+   for(const [key,source] of Object.entries(row.field_sources||{})){details.append(node('p',`${names[key]||key}：${source.definition||''} ${source.record||''}${source.bytes?' · 位元組 '+source.bytes:''}${source.source?' · '+source.source:''}`,'hint'));}
+   for(const issue of row.issues||[])details.append(node('p',String(issue),'sampling-warning'));$('samplingCompatibilitySources').append(details);
+  }
+ }
+ function drawMatchingPlot(){
+  if(!$('matchingPlotDetails').open)return;
+  const report=state?.matching_quality,row=report?.rows?.[Number($('matchingPlotRow').value)],axis=$('matchingPlotAxis').value==='azimuth'?'azimuth':'range',key=matchingKey+':'+$('matchingPlotRow').value+':'+axis;
+  if(key===matchingPlotSignature)return;matchingPlotSignature=key;
+  const target=$('matchingPlot');if(typeof Plotly==='undefined'){$('matchingPlotStatus').textContent='圖表元件尚未載入，仍可查看上方數值。';return;}
+  Plotly.purge(target);const points=(row?.points||[]).filter(p=>[p.x,p.y,p[axis]].every(Number.isFinite));
+  if(!points.length){$('matchingPlotStatus').textContent='這份報告沒有可繪製的點位；請查看表格與缺失說明。';return;}
+  $('matchingPlotStatus').textContent=`顯示 ${points.length} / ${row.retained_count??'未知'} 個保留點${row.kind==='correlation'?'':'；來源未確認為相關匹配'}。`;
+  const limit=Math.max(.001,...points.map(p=>Math.abs(p[axis]))),label=axis==='range'?'距離偏移':'方位偏移';
+  Promise.resolve(Plotly.newPlot(target,[{type:'scatter',mode:'markers',x:points.map(p=>p.x),y:points.map(p=>p.y),marker:{size:7,color:points.map(p=>p[axis]),colorscale:[[0,'#306aa5'],[.5,'#f4f4ed'],[1,'#b9444c']],cmin:-limit,cmax:limit,colorbar:{title:'像素',thickness:12}},customdata:points.map(p=>p[axis]),hovertemplate:'距離像素 %{x}<br>方位像素 %{y}<br>'+label+' %{customdata:.3f}<extra></extra>'}],{height:360,margin:{l:65,r:65,t:15,b:55},xaxis:{title:'距離向像素'},yaxis:{title:'方位向像素',autorange:'reversed'},paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'#f7f9f4',font:{family:'sans-serif',size:12,color:'#365b49'}},{responsive:true,displaylogo:false,modeBarButtonsToRemove:['toImage']})).catch(()=>{if(key===matchingPlotSignature)$('matchingPlotStatus').textContent='散點圖暫時無法顯示，請查看上方數值或切換影格重試。';});
+ }
+ $('matchingPlotDetails').ontoggle=drawMatchingPlot;$('matchingPlotRow').onchange=$('matchingPlotAxis').onchange=drawMatchingPlot;
+ function renderMatching(s){
+  const report=s.matching_quality;qualityPanel.hidden=s.config.workflow!=='alosStack'||!report||!!s.import_only;
+  if(qualityPanel.hidden){matchingKey=null;matchingPlotSignature=null;if(typeof Plotly!=='undefined')Plotly.purge($('matchingPlot'));return;}
+  const key=s.id+':'+report.report_id;if(key!==matchingKey){matchingKey=key;$('matchingConsent').checked=false;$('matchingNotes').value='';$('matchingRefreshStatus').textContent='';matchingPlotSignature=null;$('matchingPlotRow').replaceChildren();for(const [index,row] of (report.rows||[]).entries()){const option=node('option',`${shortDate(row.date)} / ${row.frame} / s${row.swath}`);option.value=String(index);$('matchingPlotRow').append(option);}if(report.rows?.length)$('matchingPlotRow').value='0';drawMatchingPlot();}
+  const waiting=s.status==='matching_review',summary=report.summary||{};$('matchingBadge').textContent=waiting?'等待人工判讀':s.matching_approval?'已記錄判讀':'品質紀錄';
+  $('matchingSummary').textContent=waiting?'匹配與幾何步驟已結束。干涉處理尚未開始；請先確認下方證據。':'這是本次匹配的品質紀錄；後續運算狀態請看上方專案進度。';
+  $('matchingMetrics').replaceChildren();for(const [label,value] of [['預期檢查項目',summary.expected],['有相關匹配紀錄',summary.correlation],['幾何／來源待確認',summary.geometry_or_unknown],['缺少證據',summary.missing]]){const card=node('div',undefined,'compatibility-check');card.append(node('small',label),node('strong',Number.isInteger(value)?String(value):'未知'));$('matchingMetrics').append(card);}
+  $('matchingWarnings').replaceChildren();for(const message of [...(report.errors||[]),...(report.warnings||[])])$('matchingWarnings').append(node('p',String(message),'sampling-warning'));
+  $('matchingRows').replaceChildren();const kinds={correlation:'相關匹配',geometry_or_unknown:'幾何／來源待確認',missing:'缺少證據'},spread=part=>part?`${measurement(part.min)} / ${measurement(part.median)} / ${measurement(part.max)}`:'未知';
+  for(const row of report.rows||[]){const tr=node('tr'),fit=row.diagnostic_fit||{},fitText=typeof fit.range_rms_px==='number'&&typeof fit.azimuth_rms_px==='number'?`${measurement(fit.range_rms_px)} / ${measurement(fit.azimuth_rms_px)}`:'無法估計';for(const value of [`${shortDate(row.date)} / ${row.frame||'未知'} / s${row.swath??'?'}`,kinds[row.kind]||'尚待確認',`${Number.isInteger(row.raw_count)?row.raw_count:'未知'} → ${Number.isInteger(row.retained_count)?row.retained_count:'未知'}`,typeof row.rejected_fraction==='number'?measurement(row.rejected_fraction,.01,1)+'%':'未知',spread(row.range),spread(row.azimuth),fitText])tr.append(node('td',value));
+   if(fit.reason)tr.children[6].append(node('p',fit.reason,'hint'));for(const message of [...(row.errors||[]),...(row.warnings||[])])tr.children[1].append(node('p',String(message),'hint'));$('matchingRows').append(tr);}
+  $('matchingDecision').hidden=!waiting;$('matchingRefresh').hidden=!waiting;$('matchingDecisionHint').textContent=report.can_continue?'此操作會接續 cmd2，並依設定進行電離層估計或後半段處理；不重新讀取或統一取樣。':'目前證據不完整，暫不能繼續。請檢查日誌與缺失，修正後按「更新品質檢查」。';
+  $('matchingConfirmed').textContent=s.matching_approval?`匹配判讀紀錄：${s.matching_approval.time||''} · ${s.matching_approval.notes||''}`:'';
  }
  function errorMessage(e){return e?.message||String(e);}
  function clearPreview(side,message='選好影像後，按「載入振幅預覽」。'){
@@ -65,6 +116,7 @@
   $('samplingVisuals').hidden=true;$('samplingReviewWarnings').replaceChildren();$('samplingProductList').replaceChildren();$('samplingDateToggles').replaceChildren();$('samplingFrameToggles').replaceChildren();
   $('samplingBasemap').value='none';$('samplingShowCommon').checked=false;$('samplingShowCandidates').checked=true;
   $('samplingReviewStatus').textContent='準備讀取影格外框與預覽清單…';
+  renderCompatibility(null);
   for(const side of panes){clearPreview(side,'先載入上方影格清單。');$(`samplingPreview${side}Select`).replaceChildren();}
  }
  function checkbox(labelText,checked,onChange,cls){const label=node('label',undefined,cls||'check'),check=node('input');check.type='checkbox';check.checked=checked;check.onchange=()=>onChange(check.checked);label.append(check,document.createTextNode(labelText));return {label,check};}
@@ -112,7 +164,7 @@
  async function loadReview(){
   if(!inspectable()||localPending())return;const key=visualKey,serial=++requestSerial,id=state.id;reviewPending=true;reviewAttempted=true;buttons();$('samplingReviewStatus').textContent='正在讀取中繼資料與影像清單，請稍候…';
   const extra=$('samplingExtraSource').value.trim();
-  try{const data=await api('/api/sampling-review',{id,extra_source:extra});if(key!==visualKey||serial!==requestSerial)return;if(data.plan_id!==state.sampling.plan_id)throw Error('取樣計畫已變更，請更新專案後再載入。');review=data;$('samplingReviewWarnings').replaceChildren();for(const warning of data.warnings||[])$('samplingReviewWarnings').append(node('p',String(warning),'sampling-warning'));renderMap(data);previewOptions(data);$('samplingReviewStatus').textContent=`已讀取 ${data.products?.length||0} 個影格；候選影格只供比較，不會自動加入處理。`;}
+  try{const data=await api('/api/sampling-review',{id,extra_source:extra});if(key!==visualKey||serial!==requestSerial)return;if(data.plan_id!==state.sampling.plan_id)throw Error('取樣計畫已變更，請更新專案後再載入。');review=data;$('samplingReviewWarnings').replaceChildren();for(const warning of data.warnings||[])$('samplingReviewWarnings').append(node('p',String(warning),'sampling-warning'));renderCompatibility(data);renderMap(data);previewOptions(data);$('samplingReviewStatus').textContent=`已讀取 ${data.products?.length||0} 個影格；候選影格只供比較，不會自動加入處理。`;}
   catch(e){if(key===visualKey&&serial===requestSerial)$('samplingReviewStatus').textContent='無法讀取影格比較：'+errorMessage(e)+' 可按更新重試；人工確認尚未送出。';}
   finally{reviewPending=false;buttons();}
  }
@@ -140,14 +192,25 @@
  for(const side of panes){$(`samplingPreview${side}Select`).onchange=()=>clearPreview(side);action($(`samplingPreview${side}Load`),()=>loadPreview(side));}
  action($('samplingContinue'),async()=>{if(!canProceed())return;const body={id:state.id,action:'sampling_continue',plan_id:state.sampling.plan_id,frames_verified:true,frame_notes:$('samplingNotes').value.trim()};transitionPending=true;buttons();try{await api('/api/action',body);await refresh();}finally{transitionPending=false;buttons();}});
  action($('samplingMatch'),async()=>{if(!canMatch())return;const body={id:state.id,action:'sampling_match',sampling_reviewed:true};transitionPending=true;buttons();try{await api('/api/action',body);await refresh();}finally{transitionPending=false;buttons();}});
+ $('matchingConsent').onchange=buttons;$('matchingNotes').oninput=buttons;
+ action($('matchingRefresh'),async()=>{
+  if($('matchingRefresh').disabled)return;const id=state.id,key=matchingKey;matchingPending=true;buttons();$('matchingRefreshStatus').textContent='正在檢查現有匹配紀錄，不會重新執行影像處理…';
+  try{await api('/api/matching-review',{id});if(id===state.id&&key===matchingKey){$('matchingConsent').checked=false;$('matchingNotes').value='';await refresh();$('matchingRefreshStatus').textContent='品質檢查已更新，請重新確認後再繼續。';}}
+  catch(e){if(id===state.id)$('matchingRefreshStatus').textContent='無法更新：'+errorMessage(e);}
+  finally{matchingPending=false;buttons();}
+ });
+ action($('matchingContinue'),async()=>{
+  if($('matchingContinue').disabled)return;const body={id:state.id,action:'matching_continue',report_id:state.matching_quality.report_id,matching_reviewed:true,matching_notes:$('matchingNotes').value.trim()};matchingPending=true;buttons();
+  try{await api('/api/action',body);await refresh();}finally{matchingPending=false;buttons();}
+ });
  window.samplingUpdate=(s,data)=>{
-  state=s;const report=s.sampling;panel.hidden=s.config.workflow!=='alosStack'||!report||!!s.import_only;if(panel.hidden){if(visualKey){clearVisuals();visualKey=null;}return;}
+  state=s;renderMatching(s);buttons();const report=s.sampling;panel.hidden=s.config.workflow!=='alosStack'||!report||!!s.import_only;if(panel.hidden){if(visualKey){clearVisuals();visualKey=null;}return;}
   const key=s.id+':'+report.plan_id;if(selectionKey!==key){selectionKey=key;$('samplingConsent').checked=false;$('samplingNotes').value='';$('samplingMatchConsent').checked=false;$('samplingExtraSource').value='';}
-  const ready=s.status==='sampling_ready',waiting=s.status==='sampling_review',sampled=ready||!!s.sampling_result,matching=!!s.sampling_match_approval,nextVisual=key+':'+(sampled?'equalized':'source');
+  const ready=s.status==='sampling_ready',waiting=s.status==='sampling_review',sampled=ready||!!s.sampling_result,matching=!!s.matching_quality,nextVisual=key+':'+(sampled?'equalized':'source');
   if(visualKey!==nextVisual){visualKey=nextVisual;clearVisuals();$('samplingMatchConsent').checked=false;}
   $('samplingApproval').hidden=!waiting;$('samplingMatchApproval').hidden=!ready;$('samplingBadge').textContent=waiting?'等待影格確認':ready?'取樣完成 · 等待匹配確認':s.sampling_approval?'已記錄人工確認':'取樣檢查';
   $('samplingStepRead').setAttribute('data-state','done');$('samplingStepReview').setAttribute('data-state',waiting?'current':s.sampling_approval?'done':'pending');$('samplingStepSample').setAttribute('data-state',sampled?'done':s.sampling_approval?'current':'pending');$('samplingStepMatch').setAttribute('data-state',matching?'done':ready?'current':'pending');
-  $('samplingSummary').textContent=`參考日期 ${shortDate(report.reference)} · ${report.rows.length} 個 SLC，${report.virtual} 個以虛擬方式讀取，${report.changed} 個${sampled?'已統一取樣':'需重取樣'}。${sampled?(matching?'已記錄啟動影像匹配的確認。':'影像匹配尚未開始。'):`預計新增 ${(report.output_bytes/1024**3).toFixed(2)} GB（另需復原副本及後續運算空間）。`}`;
+  $('samplingSummary').textContent=`參考日期 ${shortDate(report.reference)} · ${report.rows.length} 個 SLC，${report.virtual} 個以虛擬方式讀取，${report.changed} 個${sampled?'已統一取樣':'需重取樣'}。${sampled?(matching?'影像匹配已結束，品質紀錄另列於上方。':s.sampling_match_approval?'已確認啟動匹配，尚無完成品質紀錄。':'影像匹配尚未開始。'):`預計新增 ${(report.output_bytes/1024**3).toFixed(2)} GB（另需復原副本及後續運算空間）。`}`;
   $('samplingPreviewStage').textContent=sampled?'現在可選擇原始輸入與統一取樣後的影像，比較內容完整性。':'目前檢視原始輸入；完成取樣統一後，可在此檢查新的實體 SLC。';
   const tbody=$('samplingRows');tbody.replaceChildren();const sources=$('samplingSources');sources.replaceChildren();const number=(v,d)=>Number(v).toFixed(d);
   for(const row of report.rows){const tr=node('tr');const arrow=(a,b,d)=>number(a,d)+(row.changed?' → '+number(b,d):'');for(const value of [`${shortDate(row.date)}${row.date===report.reference?' · 參考':''} / ${row.frame} / s${row.swath}`,row.virtual?'虛擬 SLC（VRT）':'實體 SLC',arrow(row.rsr/1e6,row.target_rsr/1e6,6),arrow(row.prf,row.target_prf,4),`${row.width} × ${row.length}`+(row.changed?` → ${row.out_width} × ${row.out_length}`:''),row.changed?(sampled?'已統一取樣':'重新取樣'):'保留原樣'])tr.append(node('td',value));tbody.append(tr);sources.append(node('p',`${row.date} / ${row.frame}：${row.raw}`,'hint'));}

@@ -123,6 +123,11 @@ class SamplingCatalogueTests(unittest.TestCase):
         self.assertFalse((self.project/'proc/helper_sampling_approval.json').exists())
         self.assertEqual(before,{str(p):hashlib.sha256(p.read_bytes()).hexdigest()
                                  for p in self.root.rglob('*') if p.is_file()})
+        self.assertEqual(result['compatibility']['scope'], 'selected_products_only')
+        self.assertEqual({r['product_id'] for r in result['compatibility']['rows']},
+                         {p['id'] for p in result['products'] if p['selected']})
+        self.assertFalse(result['compatibility']['processing_unlocked'])
+        self.assertEqual(result['compatibility']['range_overlap']['status'], 'unknown')
 
     def test_common_coverage_unions_each_dates_frames_before_intersection(self):
         from shapely.geometry import shape
@@ -157,7 +162,10 @@ class SamplingCatalogueTests(unittest.TestCase):
         self.product('240822','0480')
         self.product('250425','0480')
         self.request['plan']['rows'].append(dict(date='240822',frame='0490',raw='/missing'))
-        self.assertFalse(self.catalogue()['coverage']['complete'])
+        result = self.catalogue()
+        self.assertFalse(result['coverage']['complete'])
+        self.assertFalse(result['compatibility']['complete'])
+        self.assertEqual(result['compatibility']['range_overlap']['status'], 'unknown')
 
     def test_disjoint_selected_frames_are_complete_but_have_no_common_area(self):
         self.product('240822','0480')

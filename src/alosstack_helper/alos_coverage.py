@@ -251,6 +251,10 @@ def outline_from_points(points):
 
 
 def _scene(raw, expected_sensor, warnings):
+    try:
+        from .compatibility import radar_metadata
+    except ImportError:
+        from compatibility import radar_metadata
     fields = _fields("scene_record.xml")
     values = {}
     names = ["Sensor platform mission identifier", "Sensor ID and mode of operation for this channel",
@@ -310,7 +314,7 @@ def _scene(raw, expected_sensor, warnings):
                 orbit=values["Orbit number"], frame=frame, frame_provenance="scene_id_label_only" if frame else "unknown",
                 orbit_direction=direction, direction=direction, look_direction=look, sensor_clock_angle_degrees=clock,
                 along_line_indicator=indicator, range_sampling_mhz=rate, center=center,
-                ellipsoid=values["Ellipsoid designator"], converted=False,
+                ellipsoid=values["Ellipsoid designator"], converted=False, radar=radar_metadata(raw, layout),
                 field_sources=dict(orbit_direction=dict(record="dataset_summary", bytes=[direction_start + 1, direction_start + 8],
                                                        definition="JAXA ASCEND/DESCEND mapping", source=SOURCES[layout]),
                                    look_direction=dict(record="dataset_summary", bytes=[477, 484], source=SOURCES[layout]),

@@ -140,6 +140,45 @@ class SamplingAPI(unittest.TestCase):
             inputs.assert_called_once_with(state, self.base)
             launch.assert_called_once_with('fixture', 'sampling_match', None, body)
 
+    def test_matching_quality_refresh_requires_auth_and_is_read_only(self):
+        with patch.object(self.engine, 'refresh_matching_quality', return_value={'report_id':'fresh'}) as check, \
+             patch.object(self.engine, 'launch') as launch:
+            for headers in ({'X-Token':''}, {'X-Token':'bad'}, {'Origin':'https://foreign.example'}):
+                self.reject('/api/matching-review', {'id':'fixture'}, headers, 403)
+            check.assert_not_called()
+            with self.request('/api/matching-review', {'id':'fixture'}) as response:
+                self.assertEqual(json.load(response), {'report_id':'fresh'})
+            check.assert_called_once_with('fixture')
+            launch.assert_not_called()
+
+    def test_matching_quality_refresh_rejects_busy_environment_and_other_processors(self):
+        with patch.object(self.engine, 'refresh_matching_quality') as check:
+            for target, attribute, value in ((self.engine,'active','busy'),
+                    (self.server.nisar_jobs,'active','busy'), (self.server.alos_batches,'active','busy'),
+                    (self.server.conversion_jobs,'active','busy')):
+                with patch.object(target,attribute,value):
+                    self.reject('/api/matching-review', {'id':'fixture'})
+            with patch.object(self.server.onboarding.runtime,'status',return_value={'status':'running'}):
+                self.reject('/api/matching-review', {'id':'fixture'})
+            with patch.object(self.server.migrations,'busy',return_value='busy'):
+                self.reject('/api/matching-review', {'id':'fixture'})
+            check.assert_not_called()
+
+    def test_matching_continue_revalidates_sources_before_launch(self):
+        state = {'id':'fixture','config':{'workflow':'alosStack'}}
+        with patch.object(self.engine,'get',return_value=state), \
+             patch.object(self.engine,'require_processing_location',return_value=state), \
+             patch.object(self.engine,'paths',return_value=(self.base,self.base,self.base)), \
+             patch.object(self.engine,'launch') as launch, \
+             patch('alosstack_helper.server.require_preflight',return_value={}) as preflight, \
+             patch('alosstack_helper.server.verify_saved_inputs') as inputs:
+            body=dict(id='fixture',action='matching_continue',report_id='current',matching_reviewed=True,matching_notes='人工確認日誌')
+            with self.request('/api/action',body) as response:
+                self.assertTrue(json.load(response)['ok'])
+            preflight.assert_called_once_with(state['config'],existing=True)
+            inputs.assert_called_once_with(state,self.base)
+            launch.assert_called_once_with('fixture','matching_continue',None,body)
+
 
 if __name__ == '__main__':
     unittest.main()

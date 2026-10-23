@@ -16,7 +16,7 @@ from .inputs import prepare_raster
 from .environment import isolated_env
 from .recovery import Recovery, PHASES, process_alive
 from .storage import ProjectStorage, read_project, absolute, atomic_existing_json, WORKFLOWS
-from . import sampling
+from . import sampling, matching_quality
 
 RESOLVE_CONFIG_SCRIPT = "import sys, os, json\nsys.path.insert(0, os.path.join(os.environ['ISCE_STACK'], 'alosStack'))\nfrom StackPulic import loadStackUserParameters\nsys.argv = ['helper', 'alosStack.xml']\ns = loadStackUserParameters('alosStack.xml')\njson.dump(dict(estimate=bool(s.doIon), apply=bool(s.applyIon), subsequent=s.numberOfSubsequentDates, subsequent_ion=s.numberOfSubsequentDatesIon), open('helper_resolved.json', 'w'))\n"
 
@@ -399,6 +399,14 @@ class Engine:
                 self.resume_phase = sampling.MATCH_PHASE
                 action = 'run'
                 expected['run'] = 'sampling_ready'
+            elif action == 'matching_continue':
+                if s['status'] != 'matching_review' or not s['config'].get('sampling_equalization'):
+                    raise ValueError('目前不在匹配品質人工檢查關卡。')
+                self.verify_commands(s)
+                matching_quality.approve(s, options or {}, self.paths(s)[1])
+                self.resume_phase = 'cmd2 · 干涉配對'
+                action = 'run'
+                expected['run'] = 'matching_review'
             retry_prepare = action == 'prepare' and self.can_retry_prepare(s)
             if s['status'] != expected.get(action) and not retry_prepare:
                 raise ValueError('目前階段不允許這個操作。')
@@ -408,6 +416,24 @@ class Engine:
             self.active = key; self.cancel.clear()
             s.update(status='running', error=''); self.save(s)
             threading.Thread(target=self.worker, args=(s, action), daemon=True).start()
+
+    def refresh_matching_quality(self, key):
+        """Read outputs at the manual gate; never rerun matching or approve it."""
+        with self.lock:
+            if self.active:
+                raise ValueError('運算進行中，請稍候再更新匹配品質。')
+            state = self.require_processing_location(key)
+            if (state.get('status') != 'matching_review' or state.get('import_only')
+                    or state['config'].get('workflow') != 'alosStack'
+                    or not state['config'].get('sampling_equalization')):
+                raise ValueError('請先完成影像匹配，進入匹配品質檢查關卡。')
+            proc, meta = self.paths(state)[1:]
+            if process_alive(meta):
+                raise ValueError('仍有先前運算程序，不能同時更新品質檢查。')
+            self.verify_commands(state)
+            report = matching_quality.publish(state, proc)
+            self.save(state)
+            return report
 
     def checkpoint(self, s, label, operation):
         if self.resume_phase:
@@ -432,7 +458,7 @@ class Engine:
         with self.lock:
             s=self.require_processing_location(key)
             if self.active or process_alive(self.paths(s)[2]): raise ValueError('運算中不能變更復原保護。')
-            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review','sampling_review','sampling_ready'):
+            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review','sampling_review','sampling_ready','matching_review'):
                 raise ValueError('只能在多日期運算開始前或人工判讀時變更後續保護。')
             s['recovery_enabled']=bool(enabled); self.save(s)
 

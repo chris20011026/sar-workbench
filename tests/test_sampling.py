@@ -73,7 +73,8 @@ class SamplingTests(unittest.TestCase):
             with self.assertRaises(ValueError): sampling.selected_frames({'properties':{'frames':frames}})
 
     def plan(self):
-        report={'plan_id':'bound-to-inputs','rows':[]}
+        report={'plan_id':'bound-to-inputs','reference':'250425',
+                'rows':[dict(date='240822',frame='0480',swath=1,relative='240822/f1_0480/s1/240822.slc')]}
         atomic_json(self.proc/'helper_sampling_plan.json', report)
         return report
 
@@ -117,9 +118,29 @@ class SamplingTests(unittest.TestCase):
                 self.engine.launch('sampling','sampling_match',options={'sampling_reviewed':True})
             self.state=self.engine.get('sampling')
             self.engine.worker(self.state,'run')
-        self.assertEqual(calls,['read','plan','apply','verify','verify','helper_cmd1_after_read.sh','cmd_2.sh','cmd_4.sh'])
-        self.assertEqual(self.state['status'],'complete')
+        self.assertEqual(calls,['read','plan','apply','verify','verify','helper_cmd1_after_read.sh'])
+        self.assertEqual(self.state['status'],'matching_review')
+        self.assertFalse(self.state['matching_quality']['can_continue'])
         self.assertTrue(self.state['sampling_match_approval']['sampling_reviewed'])
+        # Supplying explicit approval is still insufficient when cmd1 did not
+        # actually produce the expected offset evidence.
+        with self.assertRaisesRegex(ValueError,'證據缺失'):
+            self.engine.launch('sampling','matching_continue',options=dict(
+                report_id=self.state['matching_quality']['report_id'],matching_reviewed=True,matching_notes='檢查測試'))
+        # A refresh reads newly available diagnostics but never runs science.
+        folder=self.proc/'dates/240822/f1_0480/s1';folder.mkdir(parents=True)
+        points=''.join(f'{x} {x*.1+y*.02:.3f} {y} {y*.1:.3f} 10 0 0 0\n' for x in (10,20,30) for y in (10,20,30))
+        (folder/'ampcor.off').write_text(points);(folder/'cull.off').write_text(points)
+        report=self.engine.refresh_matching_quality('sampling')
+        with patch('alosstack_helper.engine.threading.Thread'):
+            self.engine.launch('sampling','matching_continue',options=dict(
+                report_id=report['report_id'],matching_reviewed=True,matching_notes='確認偏移分布與日誌'))
+        self.state=self.engine.get('sampling')
+        with patch('alosstack_helper.sampling.invoke') as invoke:
+            self.engine.worker(self.state,'run');invoke.assert_not_called()
+        self.assertEqual(calls[-2:],['cmd_2.sh','cmd_4.sh'])
+        self.assertEqual(calls.count('helper_cmd1_after_read.sh'),1)
+        self.assertEqual(self.state['status'],'complete')
 
     def test_matching_requires_ready_even_with_completed_receipt(self):
         self.approve();self.receipt()

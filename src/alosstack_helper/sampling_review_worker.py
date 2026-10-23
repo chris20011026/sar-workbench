@@ -10,9 +10,11 @@ import sys
 try:
     from .alos_coverage import read_product, _known_geometry, _decode, _polygons
     from .sampling_worker import image_info
+    from .compatibility import compatibility_report
 except ImportError:
     from alos_coverage import read_product, _known_geometry, _decode, _polygons
     from sampling_worker import image_info
+    from compatibility import compatibility_report
 
 
 def stamp(path):
@@ -86,7 +88,7 @@ def catalogue(request):
     extra = leaders(request['extra_source']) if request.get('extra_source') else []
     rows = {(r['date'], r['frame']) for r in plan['rows']}
     selected_names = {Path(r['raw']).name for r in plan['rows']}
-    products, specs, files, warnings = [], {}, {}, []
+    products, specs, files, warnings, radar_products = [], {}, {}, [], []
     def remember(path, evidence=None):
         current = stamp(path)
         if evidence is not None and any(current[k] != evidence.get(k) for k in (
@@ -120,6 +122,7 @@ def catalogue(request):
         date = (dossier.get('date') or '')[-6:]
         frame = metadata.get('frame')
         selected = leader in primary and (date, frame) in rows
+        radar_products.append({**dossier, 'selected': selected})
         geometry = _known_geometry(dossier)
         product = dict(id=dossier['id'], date=date, frame=frame, sensor=dossier['sensor'],
                        selected=selected, footprint=dossier.get('footprint') if geometry is not None else None, images=[],
@@ -200,6 +203,7 @@ def catalogue(request):
     if primary != leaders(config['data']) or (request.get('extra_source') and extra != leaders(request['extra_source'])):
         raise ValueError('來源影格清單在檢查期間改變，請重新掃描。')
     return dict(plan_id=plan['plan_id'], reference=plan['reference'], products=products,
+                compatibility=compatibility_report(radar_products, expected=rows),
                 coverage=dict(common=common, complete=complete), warnings=warnings,
                 source_fingerprint=signature(fingerprints), _files=fingerprints, _image_specs=specs,
                 note='外框來自 CEOS 中繼資料，不是精密配準或有效像素範圍；候選影格不更改處理設定。')

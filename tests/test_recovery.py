@@ -65,7 +65,7 @@ class RecoveryTests(unittest.TestCase):
 
     def sampling_plan(self):
         self.s['config']['sampling_equalization']=True
-        self.s['sampling']={'plan_id':'reviewed-original-inputs','rows':[]}
+        self.s['sampling']={'plan_id':'reviewed-original-inputs','reference':'151113','rows':[]}
         proc=self.root/'proc'
         atomic_json(proc/'helper_sampling_plan.json',self.s['sampling'])
         sampling.approve(self.s,dict(plan_id=self.s['sampling']['plan_id'],
@@ -104,7 +104,7 @@ class RecoveryTests(unittest.TestCase):
         archive=Path(self.s['recovery_attempt'])/'failed-proc/partial-sampling'
         self.assertEqual(archive.read_text(),'incomplete')
 
-    def test_matching_recovery_preserves_old_snapshot_contract_and_skips_sampling(self):
+    def test_matching_recovery_skips_sampling_but_stops_at_new_quality_gate(self):
         self.sampling_plan();self.sampling_receipt(self.s)
         # Existing snapshots predate the new separate matching-review action.
         self.assertNotIn('sampling_match_approval',self.s)
@@ -121,8 +121,8 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(self.e.get('test')['recovery']['phase'],sampling.MATCH_PHASE)
             self.resume()
         self.assertEqual([call.args[-1] for call in invoke.call_args_list],['verify','verify'])
-        self.assertEqual(calls,['helper_cmd1_after_read.sh','helper_cmd1_after_read.sh','cmd_2.sh','helper_cmd3_before_review.sh'])
-        self.assertEqual(self.s['status'],'review')
+        self.assertEqual(calls,['helper_cmd1_after_read.sh','helper_cmd1_after_read.sh'])
+        self.assertEqual(self.s['status'],'matching_review')
         self.assertEqual(len([h for h in self.s['history'] if h['stage']==sampling.MATCH_PHASE]),1)
 
     def test_ion_correction_is_not_applied_twice(self):
