@@ -139,7 +139,7 @@ class EngineTests(unittest.TestCase):
         def fake_shell(s,p):
             for d in (self.root/'proc/pairs').iterdir():(d/'filt.unw.geo').write_bytes(b'data')
         self.e.run=fake_run;self.e.shell=fake_shell;self.e.worker(self.s,'continue')
-        self.assertEqual(self.e.get('test')['status'],'complete')
+        self.assertEqual(self.e.get('test')['status'],'ion_correction_review')
         args=calls[0];self.assertEqual(args[-2:],['-exc_pair','150206-160219'])
         self.assertEqual(args[args.index('-nrlks_ion')+1],'32')
         self.assertEqual(len(calls),4)
@@ -155,7 +155,7 @@ class EngineTests(unittest.TestCase):
                 (p/'filt.unw.geo').write_bytes(b'data')
                 self.e.worker(self.s,'run')
                 self.assertEqual(calls,['cmd_1.sh','cmd_2.sh','cmd_4.sh'])
-                self.assertEqual(self.e.get('test')['status'],'complete')
+                self.assertEqual(self.e.get('test')['status'],'output_review')
     def test_estimation_only_never_applies_correction(self):
         self.make_review();self.s['ion']={'estimate':True,'apply':False}
         self.s['hashes']={'cmd_3.sh':digest(self.root/'proc/cmd_3.sh')}
@@ -164,7 +164,7 @@ class EngineTests(unittest.TestCase):
             calls.append([p.name])
             for d in (self.root/'proc/pairs').iterdir():(d/'filt.unw.geo').write_bytes(b'data')
         self.e.shell=finish_script;self.e.worker(self.s,'continue')
-        self.assertEqual(self.e.get('test')['status'],'complete')
+        self.assertEqual(self.e.get('test')['status'],'output_review')
         self.assertTrue(calls[0][1].endswith('ion_ls.py'))
         self.assertEqual(calls[1],['cmd_4.sh'])
         self.assertEqual(len(calls),2)

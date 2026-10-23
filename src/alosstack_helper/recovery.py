@@ -193,7 +193,7 @@ class Recovery:
         self.contained()
         if process_alive(self.meta): raise ValueError('仍有運算程序存在，不能建立復原點。')
         self.e.verify_commands(self.s)
-        if action not in ('run','continue') or label not in PHASES:
+        if action not in ('run','continue','ion_correction_continue') or label not in PHASES:
             raise ValueError('未知的復原階段。')
         ident = uuid.uuid4().hex; path = self.checkpoint_path(ident)
         self.base.mkdir(exist_ok=True)
@@ -246,7 +246,7 @@ class Recovery:
             path = self.checkpoint_path(info['id'])
             if digest(path/'checkpoint.json') != info['metadata_sha256']: raise ValueError('復原點紀錄已變動。')
             record = json.loads((path/'checkpoint.json').read_text())
-            if record['id']!=info['id'] or record['phase'] not in PHASES or record['action'] not in ('run','continue'):
+            if record['id']!=info['id'] or record['phase'] not in PHASES or record['action'] not in ('run','continue','ion_correction_continue'):
                 raise ValueError('復原點資訊不完整。')
             if record['config'] != signature(self.s['config']) or record['state'].get('excluded') != self.s.get('excluded'): raise ValueError('專案設定或排除清單已變動，不能使用原復原點。')
             result.update(can_recover=True, snapshot=info,

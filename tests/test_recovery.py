@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 import test_workflow
-from alosstack_helper import sampling
+from alosstack_helper import sampling, alos_acceptance
 from alosstack_helper.core import atomic_json, digest
 from alosstack_helper.recovery import Recovery, process_alive
 
@@ -126,7 +126,7 @@ class RecoveryTests(unittest.TestCase):
         self.assertEqual(len([h for h in self.s['history'] if h['stage']==sampling.MATCH_PHASE]),1)
 
     def test_ion_correction_is_not_applied_twice(self):
-        phase=self.root/'proc/phase.txt';phase.write_text('0');calls=[];fail=True
+        phase=self.root/'proc/phase.txt';phase.write_text('0');calls=[];final_calls=[];fail=True
         def run(s,args,**kw):
             nonlocal fail
             if str(args[1]).endswith('ion_ls.py'):
@@ -136,29 +136,84 @@ class RecoveryTests(unittest.TestCase):
                 pair=args[args.index('-ref_date')+1]+'-'+args[args.index('-sec_date')+1]
                 calls.append(pair)
                 phase.write_text(str(int(phase.read_text())+1))
-                if fail: fail=False;raise RuntimeError('correction interrupted')
-        self.e.run=run
-        def final(s,p):
-            for pair in (self.root/'proc/pairs').iterdir():(pair/'filt.unw.geo').write_bytes(b'out')
-        self.e.shell=final;self.e.worker(self.s,'continue')
+                if fail:fail=False;raise RuntimeError('correction interrupted')
+        self.e.run=run;self.e.shell=lambda s,p:final_calls.append(p.name)
+        self.e.worker(self.s,'continue')
         self.assertEqual(phase.read_text(),'1')
         self.resume()
-        self.assertEqual(self.s['status'],'complete')
+        self.assertEqual(self.s['status'],'ion_correction_review')
+        self.assertEqual(final_calls,[],'successful recovered correction still waits before cmd4')
+        self.assertNotIn('ion_correction_review_approval',self.s)
         self.assertEqual(phase.read_text(),'3') # three pairs, never four corrections
         self.assertEqual((Path(self.s['recovery_attempt'])/'failed-proc/phase.txt').read_text(),'1')
         self.assertEqual(len([h for h in self.s['history'] if h['stage']=='估計各日期電離層']),1)
 
-    def test_failed_final_validation_restores_before_cmd4(self):
+    def acceptance_raster(self,path,value,complex_data=False,bands=1,geo=False):
+        from test_alos_acceptance import raster
+        path=raster(path,value,complex_data=complex_data,bands=bands,geo=geo)
+        # Recovery validates native ISCE data_type as well as dimensions.
+        xml=Path(str(path)+'.xml');kind='CFLOAT' if complex_data else 'FLOAT'
+        xml.write_text(xml.read_text().replace('<imageFile>',f'<imageFile><property name="data_type"><value>{kind}</value></property>'))
+        return path
+
+    def final_products(self):
+        pair='150206-151113';suffix='_8rlks_12alks';folder=self.root/'proc/pairs'/pair/'insar'
+        for name,value in [(f'filt_{pair}{suffix}.unw.geo',2),(f'filt_{pair}{suffix}_msk.unw.geo',2),(f'{pair}{suffix}.cor.geo',.8)]:
+            self.acceptance_raster(folder/name,value,bands=2,geo=True)
+        self.acceptance_raster(self.root/f'proc/dates_resampled/151113/insar/151113{suffix}.los.geo',30,bands=2,geo=True)
+
+    def test_incomplete_final_outputs_wait_for_review_without_auto_recovery(self):
         self.s['ion']['estimate']=False;self.s['expected_pairs']=['150206-151113']
-        self.e.shell=lambda s,p:None
-        self.e.worker(self.s,'run')
-        self.assertEqual(self.e.get('test')['status'],'failed')
-        calls=[]
-        def final(s,p):
+        calls=[];self.e.shell=lambda s,p:calls.append(p.name)
+        self.e.worker(self.s,'run');self.s=self.e.get('test')
+        self.assertEqual(self.s['status'],'output_review')
+        self.assertFalse(self.s['output_acceptance']['can_continue'])
+        self.assertFalse(Recovery(self.e,self.s).report()['can_recover'])
+        self.assertEqual(self.s['recovery']['phase'],'cmd4 · 解纏與地理編碼')
+        self.assertEqual(calls,['cmd_1.sh','cmd_2.sh','cmd_4.sh'])
+        with self.assertRaises(ValueError):
+            self.e.launch('test','output_accept',options=dict(report_id=self.s['output_acceptance']['report_id'],reviewed=True,notes='缺漏不能通過'))
+
+    def test_cmd4_process_failure_restores_before_cmd4_then_waits_for_acceptance(self):
+        self.s['ion']['estimate']=False;self.s['expected_pairs']=['150206-151113'];self.s['config']['reference']='151113';calls=[];fail=True
+        def shell(s,p):
+            nonlocal fail
             calls.append(p.name)
-            (self.root/'proc/pairs/150206-151113/out.unw.geo').write_bytes(b'valid')
-        self.e.shell=final;self.resume()
-        self.assertEqual(calls,['cmd_4.sh']);self.assertEqual(self.s['status'],'complete')
+            if p.name=='cmd_4.sh':
+                partial=self.root/'proc/partial-cmd4'
+                if fail:fail=False;partial.write_text('incomplete');raise RuntimeError('cmd4 interrupted')
+                self.assertFalse(partial.exists());self.final_products()
+        self.e.shell=shell;self.e.worker(self.s,'run')
+        self.assertEqual(self.e.get('test')['status'],'failed');self.resume()
+        self.assertEqual(calls,['cmd_1.sh','cmd_2.sh','cmd_4.sh','cmd_4.sh'])
+        self.assertEqual(self.s['status'],'output_review');self.assertTrue(self.s['output_acceptance']['can_continue'])
+        self.assertNotIn('output_acceptance_approval',self.s)
+        self.assertEqual((Path(self.s['recovery_attempt'])/'failed-proc/partial-cmd4').read_text(),'incomplete')
+
+    def test_approved_ion_cmd4_recovery_rechecks_approval_without_rerunning_correction(self):
+        import cmath
+        pair='150206-151113';suffix='_8rlks_12alks';proc=self.root/'proc'
+        self.s['expected_pairs']=[pair];self.s['config']['reference']='151113';self.s['status']='ion_correction_review'
+        self.acceptance_raster(proc/f'pairs/{pair}/insar/diff_{pair}{suffix}_ori.int',cmath.exp(.7j),complex_data=True)
+        self.acceptance_raster(proc/f'pairs/{pair}/insar/diff_{pair}{suffix}.int',cmath.exp(.4j),complex_data=True)
+        for date,value in [('150206',.3),('151113',0)]:self.acceptance_raster(proc/f'dates_ion/filt_ion_{date}{suffix}.ion',value)
+        report=alos_acceptance.publish(self.s,proc,'ion')
+        approval=alos_acceptance.approve(self.s,proc,'ion',dict(report_id=report['report_id'],reviewed=True,notes='已確認校正後成果'))
+        self.e.save(self.s);calls=[];fail=True
+        def shell(s,p):
+            nonlocal fail
+            calls.append(p.name)
+            if fail:fail=False;(proc/'partial-cmd4').write_text('incomplete');raise RuntimeError('cmd4 interrupted')
+            self.assertFalse((proc/'partial-cmd4').exists());self.final_products()
+        self.e.shell=shell
+        with patch.object(self.e,'run') as correction:
+            self.e.worker(self.s,'ion_correction_continue')
+            failed=self.e.get('test');self.assertEqual(failed['status'],'failed');self.assertEqual(failed['recovery']['action'],'ion_correction_continue')
+            self.resume();correction.assert_not_called()
+        self.assertEqual(calls,['cmd_4.sh','cmd_4.sh'])
+        self.assertEqual(self.s['status'],'output_review');self.assertTrue(self.s['output_acceptance']['can_continue'])
+        self.assertEqual(self.s['ion_correction_review_approval'],approval)
+        alos_acceptance.verified_approval(self.s,proc,'ion')
 
     def test_snapshot_tampering_never_moves_failed_files(self):
         ident=self.checkpoint();p=self.rec.checkpoint_path(ident)/'proc/cmd_1.sh';p.write_text('corrupt')

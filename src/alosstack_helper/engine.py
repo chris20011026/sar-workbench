@@ -16,7 +16,7 @@ from .inputs import prepare_raster
 from .environment import isolated_env
 from .recovery import Recovery, PHASES, process_alive
 from .storage import ProjectStorage, read_project, absolute, atomic_existing_json, WORKFLOWS
-from . import sampling, matching_quality
+from . import sampling, matching_quality, alos_acceptance
 
 RESOLVE_CONFIG_SCRIPT = "import sys, os, json\nsys.path.insert(0, os.path.join(os.environ['ISCE_STACK'], 'alosStack'))\nfrom StackPulic import loadStackUserParameters\nsys.argv = ['helper', 'alosStack.xml']\ns = loadStackUserParameters('alosStack.xml')\njson.dump(dict(estimate=bool(s.doIon), apply=bool(s.applyIon), subsequent=s.numberOfSubsequentDates, subsequent_ion=s.numberOfSubsequentDatesIon), open('helper_resolved.json', 'w'))\n"
 
@@ -377,7 +377,20 @@ class Engine:
                 self.save(s)
                 threading.Thread(target=self.recover_worker,args=(s,options['snapshot']),daemon=True).start()
                 return
-            expected = {'prepare': 'new', 'run': 'ready', 'continue': 'review'}
+            if action == 'output_accept':
+                if s['status'] not in ('output_review','complete'):
+                    raise ValueError('請先完成 cmd4 並檢查成果。')
+                self.verify_commands(s)
+                alos_acceptance.approve(s,self.paths(s)[1],'outputs',options or {})
+                s.update(status='complete',stage='成果已人工驗收，可進行品質分析與 MintPy',error='')
+                s['history'].append(dict(stage='cmd4 成果人工驗收',time=time.strftime('%Y-%m-%d %H:%M:%S')))
+                self.save(s);atomic_json(self.paths(s)[2]/'report.json',s)
+                return
+            expected = {'prepare': 'new', 'run': 'ready', 'continue': 'review', 'ion_correction_continue':'ion_correction_review'}
+            if action == 'ion_correction_continue':
+                self.verify_commands(s)
+                if s['status']!='ion_correction_review':raise ValueError('目前不在電離層校正後檢查關卡。')
+                alos_acceptance.approve(s,self.paths(s)[1],'ion',options or {})
             if action == 'sampling_continue':
                 if s['status'] != 'sampling_review' or not s['config'].get('sampling_equalization'):
                     raise ValueError('目前不在取樣／影格檢查關卡。')
@@ -416,6 +429,29 @@ class Engine:
             self.active = key; self.cancel.clear()
             s.update(status='running', error=''); self.save(s)
             threading.Thread(target=self.worker, args=(s, action), daemon=True).start()
+
+    def alos_review_preview(self,key,kind,pair,report_id):
+        with self.lock:
+            if self.active:raise ValueError('運算進行中，請稍候再檢視成果。')
+            s=self.require_processing_location(key)
+            if s.get('import_only') or s['config'].get('workflow','alosStack')!='alosStack':raise ValueError('這不是可檢查的 alosStack 專案。')
+            if process_alive(self.paths(s)[2]):raise ValueError('仍有運算程序，不能讀取變動中的成果。')
+            return alos_acceptance.preview_pair(s,self.paths(s)[1],kind,pair,report_id)
+
+    def refresh_alos_review(self,key,kind):
+        with self.lock:
+            if self.active:raise ValueError('運算進行中，請稍候再檢查成果。')
+            s=self.require_processing_location(key)
+            allowed={'ion':('ion_correction_review',),'outputs':('output_review','complete')}
+            if (kind not in allowed or s['status'] not in allowed[kind] or s.get('import_only')
+                    or s['config'].get('workflow','alosStack')!='alosStack'):
+                raise ValueError('目前不在指定的 ALOS 成果檢查階段。')
+            if process_alive(self.paths(s)[2]):raise ValueError('仍有運算程序，不能更新成果檢查。')
+            self.verify_commands(s)
+            report=alos_acceptance.publish(s,self.paths(s)[1],kind)
+            # A refresh revokes previous human acceptance but never reruns cmd4.
+            if kind=='outputs':s.update(status='output_review',stage='cmd4 已結束，等待成果驗收')
+            self.save(s);return report
 
     def refresh_matching_quality(self, key):
         """Read outputs at the manual gate; never rerun matching or approve it."""
@@ -458,7 +494,7 @@ class Engine:
         with self.lock:
             s=self.require_processing_location(key)
             if self.active or process_alive(self.paths(s)[2]): raise ValueError('運算中不能變更復原保護。')
-            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review','sampling_review','sampling_ready','matching_review'):
+            if s['config'].get('workflow','alosStack')!='alosStack' or s['status'] not in ('new','ready','review','sampling_review','sampling_ready','matching_review','ion_correction_review','output_review'):
                 raise ValueError('只能在多日期運算開始前或人工判讀時變更後續保護。')
             s['recovery_enabled']=bool(enabled); self.save(s)
 
@@ -486,14 +522,10 @@ class Engine:
     def finish(self, s, science_pairs):
         _, proc, meta = self.paths(s)
         self.checkpoint(s, 'cmd4 · 解纏與地理編碼', lambda: self.shell(s, proc/'cmd_4.sh'))
-        if not science_pairs:
-            raise ValueError('沒有預期的干涉配對。')
-        for pair in science_pairs:
-            products = list((proc/'pairs'/pair).rglob('*.unw.geo'))
-            if not products or any(not p.stat().st_size for p in products):
-                raise ValueError('缺少非空的地理編碼解纏結果：'+pair)
-        if s.get('recovery_enabled'): Recovery(self,s).check_rasters(proc)
-        s.update(status='complete', stage='運算結束，請進行科學品質檢查')
+        if not science_pairs:raise ValueError('沒有預期的干涉配對。')
+        s['expected_pairs']=science_pairs
+        alos_acceptance.publish(s,proc,'outputs')
+        s.update(status='output_review',stage='cmd4 已結束，等待成果完整性與人工驗收')
         atomic_json(meta/'report.json', s)
 
     def worker(self, s, action):
@@ -588,6 +620,10 @@ class Engine:
                 if not review['images']:
                     raise ValueError('沒有找到檢查圖片，請查看 ion_check.py 的執行紀錄。')
                 s.update(status='review', stage='等待你檢查電離層圖片')
+            elif action == 'ion_correction_continue':
+                self.verify_commands(s)
+                alos_acceptance.verified_approval(s,proc,'ion')
+                self.finish(s,s['expected_pairs'])
             elif action == 'continue':
                 self.verify_commands(s)
                 review = self.review(s, s['excluded'])
@@ -613,6 +649,10 @@ class Engine:
                         self.run(s, argv, cwd=proc/'pairs'/pair, conda=True)
                 if s.get('ion', {}).get('apply', True):
                     self.checkpoint(s, '套用電離層校正', correct)
+                    s['expected_pairs']=review['science_pairs']
+                    alos_acceptance.publish(s,proc,'ion')
+                    s.update(status='ion_correction_review',stage='電離層校正已套用，先檢查再執行 cmd4')
+                    return
                 else:
                     self.log(s, '套用電離層校正已關閉：保留估計結果，不執行 ion_correct。')
                 self.finish(s, review['science_pairs'])

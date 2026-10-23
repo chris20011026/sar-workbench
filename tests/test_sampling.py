@@ -140,7 +140,12 @@ class SamplingTests(unittest.TestCase):
             self.engine.worker(self.state,'run');invoke.assert_not_called()
         self.assertEqual(calls[-2:],['cmd_2.sh','cmd_4.sh'])
         self.assertEqual(calls.count('helper_cmd1_after_read.sh'),1)
-        self.assertEqual(self.state['status'],'complete')
+        self.assertEqual(self.state['status'],'output_review')
+        self.assertFalse(self.state['output_acceptance']['can_continue'])
+        self.assertNotIn('output_acceptance_approval',self.state)
+        with self.assertRaises(ValueError):
+            self.engine.launch('sampling','output_accept',options=dict(
+                report_id=self.state['output_acceptance']['report_id'],reviewed=True,notes='不能接受缺漏成果'))
 
     def test_matching_requires_ready_even_with_completed_receipt(self):
         self.approve();self.receipt()

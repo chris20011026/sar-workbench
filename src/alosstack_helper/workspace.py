@@ -31,6 +31,10 @@ STATUS = {
     'sampling_review': ('attention', '等待確認影格與取樣'),
     'sampling_ready': ('attention', '等待檢查取樣成果'),
     'matching_review': ('attention', '等待檢查匹配品質'),
+    'ion_correction_review': ('attention', '等待檢查校正後結果'),
+    'output_review': ('attention', '等待 cmd4 成果驗收'),
+    'diagnostic_review': ('attention', '等待解纏診斷判讀'),
+    'residual_review': ('attention', '等待殘差與日期判讀'),
     'processed': ('attention', '等待整理成果'), 'failed': ('attention', '需要處理'),
     'stopped': ('attention', '已停止'), 'cancelled': ('attention', '已停止'), 'partial': ('attention', '部分完成'),
     'interrupted': ('attention', '服務曾中斷'), 'orphaned': ('attention', '前次程序仍在執行'),
@@ -67,6 +71,9 @@ def overview(engine, analyses, nisar_jobs, conversions, onboarding, alos_batches
         active = getattr(engine, 'active', None) or ''
         project['registration'] = dict(id=key, busy=project['group']=='running' or active==key or active.startswith(key+':'))
         project.update(notes=s.get('notes', ''), storage=s.get('storage', {}))
+        if s['status']=='complete' and s.get('output_acceptance_approval'):
+            project['status_label']='成果已人工確認'
+
         if s.get('storage', {}).get('relocated'):
             project.update(group='attention', status_label='位置已變更 · 可檢視成果')
         try:

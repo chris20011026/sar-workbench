@@ -92,9 +92,47 @@ statusNames.tops_ready='等待確認共同 burst';statusNames.processed='等待�
 statusNames.sampling_review='等待確認影格與取樣';
 statusNames.sampling_ready='等待檢查取樣成果';
 statusNames.matching_review='等待檢查匹配品質';
+statusNames.ion_correction_review='等待檢查校正後結果';
+statusNames.output_review='等待成果驗收';
 statusNames.pair_ready='等待開始干涉';
+function renderStackTimeline(s){
+ const steps=[['new','準備專案'],...(s.config.sampling_equalization?[['sampling_review','影格與取樣'],['sampling_ready','取樣成果'],['matching_review','匹配品質']]:[['ready','干涉處理']]),...(s.ion?.estimate===false?[]:[['review','電離層估計'],...(s.ion?.apply===false?[]:[['ion_correction_review','校正後檢查']])]),['output_review','cmd4 成果驗收'],['complete','後續分析']];
+ const timeline=$('timeline');timeline.setAttribute('aria-label','處理流程與人工檢查點');
+ for(const [i,[state,label]] of steps.entries()){const item=node('div',`${i+1}  ${label}`,s.status===state?'selected':'');if(s.status===state)item.setAttribute('aria-current','step');timeline.append(item);}
+}
 function summary(s){$('summary').replaceChildren();const c=s.config;for(const [k,v] of Object.entries({'資料來源':c.source,...(c.workflow==='topsApp'?{'比較影像':c.secondary_safe,'子波束':c.swaths.join('、'),'極化':c.polarization,'選區':c.roi?.join('、')||'完整共同範圍'}:{}),'資料使用方式':c.copy?'複製與驗證':'直接讀取','參考日期':c.reference,...(c.workflow==='alos2App'?{'比較日期':c.secondary,'frame':c.frames.join('、'),'地理編碼範圍':c.bbox?.join('、')||'使用參考影像範圍'}:{}),'環境':c.env,'對位 DEM':c.dem,'地理編碼 DEM':c.dem_geo,'水體遮罩':c.wbd,...c.properties,...(s.ion?{'本次電離層估計':s.ion.estimate==null?'未記錄':s.ion.estimate?'啟用':'關閉','本次套用校正':s.ion.apply==null?'未記錄':s.ion.estimate&&s.ion.apply?'啟用':'不執行',...(c.workflow==='alos2App'?{}:{'本次一般配對數':s.ion.subsequent,'本次電離層配對數':s.ion.subsequent_ion})}:{}),...Object.fromEntries(Object.entries(s.looks||{}).filter(([k])=>k.includes('lks')).map(([k,v])=>['本次生成 '+k,v]))})){$('summary').append(node('dt',labels[k]||k),node('dd',v));}}
-async function refresh(){const data=await api('/api/state');projects=data.projects;defaults=data.defaults;window.workbenchState=data;window.workbenchCatalog?.(data);window.onboardingUpdate?.(data);$('projects').replaceChildren();for(const s of projects){const b=node('button',s.display_name||s.config.name||'未命名專案','nav'+(current===s.id?' active':''));b.onclick=async()=>{current=s.id;reviewLoaded=null;clear();try{await refresh();}catch(e){fail(e);}};$('projects').append(b);}for(const p of data.unavailable_projects||[]){const b=node('button','專案路徑無法讀取','nav');b.disabled=true;b.title=p.root+' — '+p.reason;$('projects').append(b);}if(!current)return;window.leaveWorkspace?.('openOverview');window.closeLibrary?.();window.closeMissions?.();if($('welcome'))$('welcome').hidden=true;$('openWelcome')?.classList.remove('active');$('newProject').classList.remove('active');const s=projects.find(x=>x.id===current);if(!s){await window.projectBecameUnavailable?.();return;}$('setup').hidden=true;$('project').hidden=false;$('crumb').textContent=s.display_name||s.config.name;$('projectName').textContent=s.display_name||s.config.name;$('projectPath').textContent=s.config.root;$('status').textContent=statusNames[s.status];$('stage').textContent=s.stage;$('error').textContent=s.error||'';summary(s);window.samplingUpdate?.(s,data);$('timeline').hidden=!!s.import_only;window.topsValidationUpdate?.(s,data);window.researchUpdate?.(s,data);window.projectStorageUpdate?.(s,data);$('history').replaceChildren();for(const h of s.history)$('history').append(node('p',h.time+' · '+h.stage,'hint'));if($('topsWorkbench'))$('topsWorkbench').hidden=s.config.workflow!=='topsApp';if(s.config.workflow==='topsApp'){await window.topsUpdate(s,data);await refreshLog();return;}if(s.config.workflow==='alos2App'){await window.pairUpdate(s,data);await refreshLog();return;}if($('pairWorkbench'))$('pairWorkbench').hidden=true;$('timeline').replaceChildren();$('timeline').hidden=!!s.import_only;(s.config.sampling_equalization?['準備專案','影格確認','取樣成果確認','匹配品質確認','電離層判讀','後半段']:['準備專案','跑到檢查點','人工判讀','後半段']).forEach((x,i)=>$('timeline').append(node('div',`${i+1}  ${x}`,(s.status==='review'&&i===(s.config.sampling_equalization?4:2)||s.status==='sampling_review'&&i===1||s.status==='sampling_ready'&&i===2||s.status==='matching_review'&&i===3)?'selected':'')));$('actions').replaceChildren();const add=(text,a)=>{const b=node('button',text,'primary');b.disabled=Boolean(s.storage?.relocated);action(b,async()=>{b.disabled=true;try{if(a==='run'){await window.confirmProcessing(current);return;}await api('/api/action',{id:current,action:a});await refresh();}finally{b.disabled=false;}});$('actions').append(b);};if(s.status==='new')add('確認設定，準備資料與指令','prepare');if(s.status==='ready')add(s.config.sampling_equalization?'讀取資料，前往影格與取樣檢查':s.ion?.estimate===false?'開始 cmd1、cmd2、cmd4（跳過電離層）':'開始 cmd1～3，跑到檢查點','run');if(s.status==='running'){const b=node('button','停止工作');action(b,()=>api('/api/stop',{}));$('actions').append(b);}if(s.status==='failed'){if(s.can_retry_prepare){add('重新檢查並準備指令','prepare');$('actions').append(node('p','尚未進入科學運算，可重試準備步驟。','hint'));}else $('actions').append(node('p','已保留日誌與現有輸出。請開啟「恢復中心」診斷；具備有效副本才可確認復原。','hint'));}$('review').hidden=s.status!=='review';$('continue').disabled=Boolean(s.storage?.relocated);$('continue').textContent=s.ion?.apply===false?'確認判讀，保留估計並跑 cmd4（不套用校正） →':'確認並執行後半段 →';if(s.status==='review'&&reviewLoaded!==current){await renderReview();reviewLoaded=current;}await Promise.all([refreshLog(),window.workbenchUpdate?.(s,data)]);}
+let refreshGeneration=0,reviewGeneration=0,reviewInFlight=null,reviewViewport=null,reviewSubmitting=false;
+function ionReviewCanContinue(){
+ const s=projects.find(p=>p.id===current);
+ return Boolean(s&&s.status==='review'&&reviewLoaded===current&&!reviewSubmitting&&!window.workbenchState?.busy&&!s.storage?.relocated&&!s.storage?.inputs_missing);
+}
+function syncIonReview(s){
+ const identity=s.id+':'+s.status;
+ if(reviewViewport!==identity){reviewViewport=identity;reviewGeneration++;reviewInFlight=null;reviewLoaded=null;$('reviewed').checked=false;$('continue').disabled=true;}
+}
+async function refresh(){
+ const generation=++refreshGeneration,key=current,data=await api('/api/state');
+ if(generation!==refreshGeneration||current!==key)return;
+ projects=data.projects;defaults=data.defaults;window.workbenchState=data;window.workbenchCatalog?.(data);window.onboardingUpdate?.(data);
+ $('projects').replaceChildren();for(const s of projects){const b=node('button',s.display_name||s.config.name||'未命名專案','nav'+(current===s.id?' active':''));b.onclick=async()=>{current=s.id;reviewLoaded=null;$('continue').disabled=true;clear();try{await refresh();}catch(e){fail(e);}};$('projects').append(b);}
+ for(const p of data.unavailable_projects||[]){const b=node('button','專案路徑無法讀取','nav');b.disabled=true;b.title=p.root+' — '+p.reason;$('projects').append(b);}
+ if(!current)return;window.leaveWorkspace?.('openOverview');window.closeLibrary?.();window.closeMissions?.();if($('welcome'))$('welcome').hidden=true;$('openWelcome')?.classList.remove('active');$('newProject').classList.remove('active');
+ const s=projects.find(x=>x.id===key);if(!s){await window.projectBecameUnavailable?.();return;}
+ syncIonReview(s);$('setup').hidden=true;$('project').hidden=false;$('crumb').textContent=s.display_name||s.config.name;$('projectName').textContent=s.display_name||s.config.name;$('projectPath').textContent=s.config.root;$('status').textContent=statusNames[s.status];$('stage').textContent=s.stage;$('error').textContent=s.error||'';summary(s);window.samplingUpdate?.(s,data);window.alosAcceptanceUpdate?.(s,data);$('timeline').hidden=!!s.import_only;window.topsValidationUpdate?.(s,data);window.researchUpdate?.(s,data);window.projectStorageUpdate?.(s,data);
+ $('history').replaceChildren();for(const h of s.history)$('history').append(node('p',h.time+' · '+h.stage,'hint'));if($('topsWorkbench'))$('topsWorkbench').hidden=s.config.workflow!=='topsApp';
+ if(s.config.workflow==='topsApp'){await window.topsUpdate(s,data);if(current===key&&generation===refreshGeneration)await refreshLog();return;}
+ if(s.config.workflow==='alos2App'){await window.pairUpdate(s,data);if(current===key&&generation===refreshGeneration)await refreshLog();return;}
+ if($('pairWorkbench'))$('pairWorkbench').hidden=true;$('timeline').replaceChildren();$('timeline').hidden=!!s.import_only;renderStackTimeline(s);$('actions').replaceChildren();
+ const add=(text,a)=>{const b=node('button',text,'primary');b.disabled=Boolean(data.busy||s.storage?.relocated);action(b,async()=>{if(current!==key||b.disabled)return;b.disabled=true;try{if(a==='run'){await window.confirmProcessing(key);return;}await api('/api/action',{id:key,action:a});await refresh();}finally{b.disabled=false;}});$('actions').append(b);};
+ if(s.status==='new')add('確認設定，準備資料與指令','prepare');
+ if(s.status==='ready')add(s.config.sampling_equalization?'讀取資料，前往影格與取樣檢查':s.ion?.estimate===false?'開始 cmd1、cmd2、cmd4（跳過電離層）':'開始 cmd1～3，跑到檢查點','run');
+ if(s.status==='running'){const b=node('button','停止工作');action(b,()=>current===key?api('/api/stop',{}):null);$('actions').append(b);}
+ if(s.status==='failed'){if(s.can_retry_prepare){add('重新檢查並準備指令','prepare');$('actions').append(node('p','尚未進入科學運算，可重試準備步驟。','hint'));}else $('actions').append(node('p','已保留日誌與現有輸出。請開啟「恢復中心」診斷；具備有效副本才可確認復原。','hint'));}
+ $('review').hidden=s.status!=='review';$('continue').disabled=!ionReviewCanContinue();$('continue').textContent=s.ion?.apply===false?'確認判讀，保留估計並跑 cmd4（不套用校正） →':'套用校正，前往校正後檢查 →';
+ if(s.status==='review'&&reviewLoaded!==key){try{await renderReview(key);}catch(e){if(current===key)fail(e);}}
+ if(generation!==refreshGeneration||current!==key)return;
+ await Promise.all([refreshLog(),window.workbenchUpdate?.(s,data)]);
+}
 let logProject=null,logGeneration=0;
 async function refreshLog(){
  const project=projects.find(s=>s.id===current);if(project){window.preflightProject?.(project);window.confirmationProject?.(project);window.recoveryUpdate?.(project);}
@@ -110,8 +148,39 @@ async function refreshLog(){
   status.textContent='執行日誌暫時無法讀取；其他設定與成果仍可使用。請點「更新」重試。'+(e instanceof TypeError?' 瀏覽器可能攔截了請求，或本機服務連線中斷。':' '+e.message);status.hidden=false;
  }
 }
-async function renderReview(){const d=await api('/api/review?id='+current);$('pairs').replaceChildren();$('looks').replaceChildren();$('reviewed').checked=false;objectURLs.forEach(URL.revokeObjectURL);objectURLs=[];for(const [k,v]of Object.entries(d.options))if(k.includes('lks'))$('looks').append(node('span',k+': '+v,'chip'));for(const pair of d.pairs){const card=node('div',undefined,'pair'),label=node('label',undefined,'check'),check=node('input');check.type='checkbox';check.value=pair;label.append(check,document.createTextNode('排除 '+pair));card.append(label);const images=d.images.filter(x=>x.includes(pair));if(!images.length)card.append(node('p','沒有找到對應圖片，請查看完整檢查輸出。','error'));for(const file of images){const r=await fetch('/api/image?id='+current+'&file='+encodeURIComponent(file),{headers:{'X-Token':token}});if(!r.ok)throw Error('圖片載入失敗');const url=URL.createObjectURL(await r.blob());objectURLs.push(url);const img=node('img');img.src=url;img.alt=pair+' 電離層檢查';img.onclick=()=>{$('largeImage').src=url;$('imageDialog').showModal();};card.append(img);}$('pairs').append(card);}}
-action($('continue'),async()=>{if(!$('reviewed').checked)throw Error('請先檢查圖片並勾選確認。');const excluded=[...$('pairs').querySelectorAll('input:checked')].map(x=>x.value);await api('/api/action',{id:current,action:'continue',excluded});await refresh();});
+async function renderReview(key=current){
+ if(reviewInFlight?.key===key)return reviewInFlight.promise;
+ const ticket=++reviewGeneration,holder={key,promise:null};reviewInFlight=holder;reviewLoaded=null;$('reviewed').checked=false;$('continue').disabled=true;
+ $('pairs').replaceChildren(node('p','正在載入本專案的電離層檢查圖；全部載入後才能確認。','hint'));$('looks').replaceChildren();
+ const active=()=>current===key&&ticket===reviewGeneration&&projects.some(s=>s.id===key&&s.status==='review');
+ holder.promise=(async()=>{
+  const urls=[];let mounted=false;
+  try{
+   const d=await api('/api/review?id='+encodeURIComponent(key));if(!active())return false;
+   const pairs=document.createDocumentFragment(),looks=document.createDocumentFragment();
+   for(const [k,v] of Object.entries(d.options||{}))if(k.includes('lks'))looks.append(node('span',k+': '+v,'chip'));
+   if(!d.pairs?.length)throw Error('目前沒有可判讀的電離層配對；請檢查完整輸出。');
+   for(const pair of d.pairs){
+    const card=node('div',undefined,'pair'),label=node('label',undefined,'check'),check=node('input');check.type='checkbox';check.value=pair;label.append(check,document.createTextNode('排除 '+pair));card.append(label);
+    const images=(d.images||[]).filter(x=>x.includes(pair));if(!images.length)throw Error(pair+' 沒有對應檢查圖；請查看完整檢查輸出。');
+    for(const file of images){
+     const r=await fetch('/api/image?id='+encodeURIComponent(key)+'&file='+encodeURIComponent(file),{headers:{'X-Token':token}});if(!r.ok)throw Error(pair+' 圖片載入失敗');
+     const blob=await r.blob();if(!active())return false;const url=URL.createObjectURL(blob);urls.push(url);const img=node('img');img.src=url;img.alt=pair+' 電離層檢查';img.onclick=()=>{if(current!==key||reviewLoaded!==key)return;$('largeImage').src=url;$('imageDialog').showModal();};card.append(img);
+    }
+    pairs.append(card);
+   }
+   if(!active())return false;
+   objectURLs.forEach(URL.revokeObjectURL);objectURLs=urls;$('pairs').replaceChildren(pairs);$('looks').replaceChildren(looks);reviewLoaded=key;mounted=true;$('continue').disabled=!ionReviewCanContinue();return true;
+  }catch(e){if(active()){$('pairs').replaceChildren(node('p','檢查圖未完整載入：'+e.message,'error'));$('continue').disabled=true;}throw e;}
+  finally{if(!mounted)urls.forEach(URL.revokeObjectURL);if(reviewInFlight===holder)reviewInFlight=null;}
+ })();return holder.promise;
+}
+action($('continue'),async()=>{
+ const key=current;if(!ionReviewCanContinue())throw Error('請先完整載入目前專案的檢查圖，並確認沒有其他工作執行中。');if(!$('reviewed').checked)throw Error('請先檢查圖片並勾選確認。');
+ const excluded=[...$('pairs').querySelectorAll('input:checked')].map(x=>x.value);reviewSubmitting=true;$('continue').disabled=true;
+ try{await api('/api/action',{id:key,action:'continue',excluded});if(current===key)await refresh();}
+ finally{reviewSubmitting=false;$('continue').disabled=!ionReviewCanContinue();}
+});
 $('closeImage').onclick=()=>$('imageDialog').close();action($('refreshLog'),refreshLog);
 (async()=>{try{await refresh();$('env').value=defaults.env;properties=initial();renderProperties();/* Deliberately do not import example geographic paths or dates. */}catch(e){fail(e);}})();
 setInterval(()=>{if(current&&!document.hidden)refresh().catch(fail);},3000);
@@ -128,7 +197,7 @@ setInterval(()=>{if(current&&!document.hidden)refresh().catch(fail);},3000);
  <details><summary>選檔視窗沒出現</summary><p>先確認其他 macOS 選擇視窗是否仍在等待。可以將「檔案選擇方式」切換成「網頁內建選擇器」，直接選取資料。取消選擇不會開始處理。</p></details>
  <details><summary>運算失敗或中斷，如何繼續？</summary><ol><li>記下目前階段和日誌最後的完整錯誤，確認磁碟空間及來源連線。</li><li>ALOS 多日期可開啟「恢復中心」查看診斷；其他流程依各自頁面的中斷說明處理。具有有效副本時，依提示核對後恢復；沒有副本時不要直接重跑半成品。</li><li>已統一取樣的專案，不要自行重新跑原本 cmd1 的 read_data，避免覆寫已確認的成果。</li><li>環境問題先到「工具與環境」檢查所選環境，再決定是否修復；不要一開始就重裝或刪除環境。</li></ol></details>
  <details><summary>更新、備份與解除安裝</summary><p>先完成或停止工作並結束 App。備份整個專案（包含隱藏的 .helper、proc、analyses）及外部來源，再更新啟動器或程式碼。只有專案捷徑／連結的備份不包含原始影像。</p><p>專用環境在新版本確認可用前先保留；既有專案不會因為下載新版而自動改用另一套環境。解除安裝請使用啟動器的「解除安裝運算工具」，核對路徑；不要直接刪除整個 sar-workbench 資料夾。</p></details>
- <details><summary>畫面顯示完成，代表結果可信嗎？</summary><p>「運算完成」只代表程式結束。ALOS 跨衛星流程仍需要影格對應、取樣成果、匹配品質及電離層判讀；MintPy 也需要確認參考點、配對網路與結果品質。未知資訊會保留為待確認。單軌 LOS 位移不能直接當作垂直沉降。</p></details>
+ <details><summary>畫面顯示完成，代表結果可信嗎？</summary><p>「運算完成」只代表程式結束。ALOS 跨衛星流程需要影格對應、取樣成果、匹配品質及電離層判讀；套用校正後會再停下檢查，cmd4 結束還需要成果驗收。MintPy 在解纏診斷與殘差／日期判讀各有一個關卡；未產生殘差檔時會明確標示 RMS 未執行。未知資訊會保留為待確認。單軌 LOS 位移不能直接當作垂直沉降。</p></details>
  <p class="hint">這份說明隨程式保存，離線可讀。完整操作與已知限制：</p><div class="inline"><a href="https://github.com/chris20011026/sar-workbench/blob/main/docs/OPERATIONS.md" target="_blank" rel="noopener noreferrer">日常維護指南 ↗</a><a href="https://github.com/chris20011026/sar-workbench/releases" target="_blank" rel="noopener noreferrer">下載與版本紀錄 ↗</a><a href="https://github.com/chris20011026/sar-workbench/issues" target="_blank" rel="noopener noreferrer">回報問題 ↗</a></div><p class="hint">回報前請遮蔽帳號、憑證與私人路徑；附上版本、出錯階段及錯誤訊息即可。</p>`;
  document.body.append(dialog);
  $('openHelp').onclick=()=>{dialog.showModal();$('closeHelp').focus();};

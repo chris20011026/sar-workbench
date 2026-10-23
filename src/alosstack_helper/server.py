@@ -75,14 +75,14 @@ def make_server(engine, port=8765):
     confirmations = Confirmations()
     storage_usage = StorageUsage(engine)
     migrations = Migrations(engine)
-    migration_writes = ('/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/create',
+    migration_writes = ('/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/create',
                         '/api/project-remove', '/api/project-attach', '/api/recovery-enable',
-                        '/api/analysis-rename', '/api/survey', '/api/geo-view', '/api/geo-point',
+                        '/api/analysis-rename', '/api/analysis-spatial', '/api/survey', '/api/geo-view', '/api/geo-point',
                         '/api/geo-export', '/api/geo-figure', '/api/setup-start', '/api/demo-start',
                         '/api/terrain-start', '/api/import-start', '/api/nisar-create', '/api/nisar-run',
                         '/api/alos4-conversion-create', '/api/alos4-conversion-run',
                         '/api/comparison-start', '/api/research-report-start', '/api/legacy-preview', '/api/legacy-create',
-                        '/api/alos-preparation-scan', '/api/alos-preparation-run', '/api/alos-preparation-review')
+                        '/api/alos-preparation-scan', '/api/alos-preparation-run', '/api/alos-preparation-review', '/api/alos-review', '/api/alos-review-preview')
     launches_for_alos_guard = set(migration_writes) | {'/api/environment-check', '/api/migration-plan', '/api/migration-copy', '/api/migration-switch'}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
@@ -104,7 +104,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css', '/sampling.js', '/sampling.css'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css', '/sampling.js', '/sampling.css', '/alos-acceptance.js', '/mintpy-diagnostics.js', '/mintpy-diagnostics.css'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -206,7 +206,7 @@ def make_server(engine, port=8765):
             except Exception as e: self.send({'error':str(e)},400)
         def do_POST(self):
             # Serialize launch decisions across ISCE2, ISCE3 and environment setup.
-            launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert',
+            launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review',
                         '/api/demo-start', '/api/terrain-start', '/api/import-start',
                         '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
                         '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach', '/api/storage-usage-start',
@@ -221,13 +221,17 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
-                if self.path in ('/api/sampling-review', '/api/sampling-preview', '/api/matching-review'):
+                if self.path in ('/api/sampling-review', '/api/sampling-preview', '/api/matching-review', '/api/alos-review', '/api/alos-review-preview'):
                     if engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or onboarding.runtime.status().get('status') == 'running' or any(j['status'] == 'running' for j in onboarding.jobs.values()):
                         raise ValueError('請等待目前運算、安裝或搬移結束，再載入影格預覽。')
                     if self.path == '/api/sampling-review':
                         return self.send(sampling_reviews.review(d['id'], d.get('extra_source')))
                     if self.path == '/api/matching-review':
                         return self.send(engine.refresh_matching_quality(d['id']))
+                    if self.path == '/api/alos-review':
+                        return self.send(engine.refresh_alos_review(d['id'], d.get('kind')))
+                    if self.path == '/api/alos-review-preview':
+                        return self.send(engine.alos_review_preview(d['id'],d.get('kind'),d.get('pair'),d.get('report_id')))
                     return self.send(sampling_reviews.preview(d['id'], d['image_id'], d['plan_id']))
                 if self.path in migration_writes and migrations.busy():
                     raise ValueError('專案安全搬移進行中，請先完成或暫停搬移，再更改資料或啟動運算。')
@@ -295,7 +299,7 @@ def make_server(engine, port=8765):
                     if engine.active or nisar_jobs.active or conversion_jobs.active or onboarding.runtime.status().get('status')=='running' or any(j['status']=='running' for j in onboarding.jobs.values()):
                         raise ValueError('請等目前的運算或安裝工作結束，再驗證環境。')
                     return self.send(environment_checks.run(d['path'], defaults()['environments']))
-                if (nisar_jobs.active or conversion_jobs.active) and self.path in ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/demo-start', '/api/terrain-start', '/api/import-start'):
+                if (nisar_jobs.active or conversion_jobs.active) and self.path in ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/demo-start', '/api/terrain-start', '/api/import-start'):
                     raise ValueError('請先完成或停止實驗室中的工作。')
                 if self.path in ('/api/nisar-create', '/api/nisar-run'):
                     if engine.active or conversion_jobs.active or onboarding.runtime.status().get('status') == 'running' or any(j['status']=='running' for j in onboarding.jobs.values()):
@@ -359,6 +363,12 @@ def make_server(engine, port=8765):
                     return self.send(analyses.create(d['id'],d['kind'],d))
                 if self.path == '/api/analysis-invert':
                     return self.send(analyses.invert(d['id'],d['run'],d))
+                if self.path == '/api/analysis-review':
+                    if onboarding.runtime.status().get('status') == 'running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先完成運算工具安裝或資料準備，再繼續 MintPy 判讀流程。')
+                    return self.send(analyses.review_continue(d['id'],d['run'],d))
+                if self.path == '/api/analysis-spatial':
+                    return self.send(analyses.spatial(d['id'],d['run'],d))
                 if self.path == '/api/analysis-point': return self.send(analyses.point(d['id'],d['run'],d['y'],d['x']))
                 if self.path == '/api/survey':return self.send(analyses.survey(d['id'],d))
                 if self.path == '/api/geo-view':return self.send(analyses.geo_view(d['id'],d['run']))
@@ -372,10 +382,10 @@ def make_server(engine, port=8765):
                     if s['config'].get('workflow')=='topsApp':
                         TopsWorkflow(engine).verify(s)
                         engine.launch(d['id'],d['action'],options=d);return self.send({'ok':True})
-                    if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover', 'sampling_continue', 'sampling_match', 'matching_continue'):
+                    if d['action'] in ('prepare', 'run', 'continue', 'resume', 'recover', 'sampling_continue', 'sampling_match', 'matching_continue', 'ion_correction_continue'):
                         report = require_preflight(s['config'], existing=True)
                         atomic_json(engine.paths(s)[2]/'preflight.json', report)
-                    if d['action'] in ('prepare','run','sampling_continue','sampling_match','matching_continue'):
+                    if d['action'] in ('prepare','run','sampling_continue','sampling_match','matching_continue','ion_correction_continue'):
                         verify_saved_inputs(s,engine.paths(s)[2])
                     engine.launch(d['id'],d['action'],d.get('excluded'),d); return self.send({'ok':True})
                 if self.path == '/api/stop': engine.stop(); return self.send({'ok':True})
@@ -402,6 +412,7 @@ def make_server(engine, port=8765):
     server.legacy = legacy
     server.tops_validation = tops_validation
     server.sampling_reviews = sampling_reviews
+    server.analyses = analyses
     return server
 
 def main():

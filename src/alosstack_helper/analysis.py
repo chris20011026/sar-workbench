@@ -5,6 +5,7 @@ from .core import atomic_json, digest, find_conda
 from .environment import isolated_env
 from .workflows import inventory, options
 from .storage import atomic_existing_json
+from . import mintpy_diagnostics as diagnostics
 
 WORKER=Path(__file__).with_name('science_worker.py')
 
@@ -137,6 +138,50 @@ class Analyses:
         conda = find_conda(job['environment'])
         if not conda:raise ValueError('所選分析環境已移除，請重新安裝或選擇其他環境。')
         return [conda,'run','--no-capture-output','-p',job['environment'],'python',str(WORKER),*args]
+    def review_continue(self,key,run,data):
+        with self.engine.lock:
+            self.reserve();state=self.engine.require_processing_location(key,check_inputs=False)
+            if state.get('import_only'):
+                from .legacy import require_legacy_source
+                require_legacy_source(state)
+            p=self.folder(key,run);job=self.get(key,run)
+            expected={'diagnostic_review':'unwrap','residual_review':'residual'}
+            if job.get('kind')!='mintpy' or job.get('status') not in expected:
+                raise ValueError('此分析不在可確認的診斷關卡。')
+            if fingerprint(job['inventory']['files'])!=job['source_fingerprint']:
+                raise ValueError('來源影像或 metadata 已改變，請另建分析版本。')
+            report=diagnostics.verify(p,data.get('report_id'))
+            if report['stage']!=expected[job['status']]:raise ValueError('診斷報告不屬於目前關卡。')
+            choice=diagnostics.decision(report,data)
+            if report['stage']=='residual':
+                result=subprocess.run(self.command(job,['validate_review',str(p/'analysis.json'),json.dumps(choice)]),cwd=p,env=clean_env(p/'cache'),capture_output=True,text=True,timeout=60)
+                if result.returncode:
+                    lines=result.stderr.splitlines()+result.stdout.splitlines()
+                    message=next((v.partition('ValueError: ')[2] for v in reversed(lines) if 'ValueError: ' in v),'所選日期無法估計本次時間模型；請調整選擇。')
+                    raise ValueError(message)
+            mode='corrections' if report['stage']=='unwrap' else 'finalize'
+            job.setdefault('review_decisions',[]).append(choice);job['review_pending']=choice
+            job.update(status='running',stage='執行反演與校正' if mode=='corrections' else '套用日期判讀並估計速度',error='')
+            atomic_existing_json(p/'analysis.json',job)
+            self.engine.active=key+':'+run;self.engine.cancel.clear()
+            threading.Thread(target=self.worker,args=(key,run,mode),daemon=True).start()
+            return job
+
+    def spatial(self,key,run,data):
+        p=self.folder(key,run);job=self.get(key,run)
+        if job.get('kind')!='mintpy' or job.get('status') not in ('residual_review','complete'):
+            raise ValueError('請先完成時序反演至殘差判讀關卡。')
+        date=data.get('date')
+        if not isinstance(date,str) or not re.fullmatch(r'\d{8}',date):raise ValueError('請選擇有效日期。')
+        with self.geo_lock:
+            result=subprocess.run(self.command(job,['spatial',str(p/'analysis.json'),date]),cwd=p,env=clean_env(p/'cache'),capture_output=True,text=True,timeout=120)
+            if result.returncode:
+                lines=result.stderr.splitlines()+result.stdout.splitlines()
+                message=next((v.partition('ValueError: ')[2] for v in reversed(lines) if 'ValueError: ' in v),'空間診斷無法讀取，請查看分析日誌。')
+                raise ValueError(message)
+            values=[v[7:] for v in result.stdout.splitlines() if v.startswith('RESULT:')]
+            if not values:raise ValueError('空間診斷未傳回資料。')
+            return json.loads(values[-1])
     def worker(self,key,run,mode):
         p=None;job=None;process=None
         try:
@@ -154,7 +199,12 @@ class Analyses:
                 detail=failure_detail(p/'run.log') if code and not self.engine.cancel.is_set() else ''
                 raise RuntimeError((detail+'。' if detail else '')+f'分析停止（結束碼 {code}），已保留輸出與日誌，可另建版本。')
             if fingerprint(job['inventory']['files'])!=job['source_fingerprint']:raise RuntimeError('分析期間來源檔案改變，結果不能標示完成。')
-            job.update(status='loaded' if mode=='load' else 'complete',stage={'load':'資料已載入，等待確認參考點','invert':'時序分析完成，請檢查品質','quality':'品質檢查完成'}[mode])
+            states={'load':('loaded','資料已載入，等待確認參考點'),
+                    'invert':('diagnostic_review','等待判讀配對網路、閉合統計與連通區'),
+                    'corrections':('residual_review','等待判讀殘差與各日期空間分布'),
+                    'finalize':('complete','時序分析完成，請檢查品質'),
+                    'quality':('complete','品質檢查完成')}
+            status,label=states[mode];job.update(status=status,stage=label)
         except Exception as e:
             if process and process.poll() is None:
                 try:
@@ -177,9 +227,13 @@ class Analyses:
                 with self.engine.lock:self.engine.active=None;self.engine.process=None
     def details(self,key,run):
         p=self.folder(key,run);job=self.get(key,run)
-        for name in ('quality','loaded','results'):
+        for name in ('quality','loaded','results','diagnostics'):
             f=p/(name+'.json')
             if f.exists():job[name]=json.loads(f.read_text())
+        job['diagnostic_reports']={}
+        for stage in ('unwrap','residual'):
+            f=p/'exports'/('diagnostics-'+stage+'.json')
+            if f.is_file():job['diagnostic_reports'][stage]=json.loads(f.read_text())
         f=p/'run.log'
         if f.exists():
             with f.open('rb') as h:h.seek(max(0,f.stat().st_size-18000));job['log']=h.read().decode(errors='replace')

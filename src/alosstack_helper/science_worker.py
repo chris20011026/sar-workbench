@@ -5,9 +5,11 @@ import xml.etree.ElementTree as ET
 import numpy as np
 try:
     from . import mintpy_runtime as runtime
+    from . import mintpy_diagnostics as diagnostics
     from .mintpy_parameters import normalize_overrides
 except ImportError:
     import mintpy_runtime as runtime
+    import mintpy_diagnostics as diagnostics
     from mintpy_parameters import normalize_overrides
 
 
@@ -126,6 +128,16 @@ def mintpy_steps(job_path,names):
             runtime.before_step(job_path,name)
             if name=='correct_troposphere':
                 with runtime.offline_weather():main([str(p/'mintpy.cfg'),'--dostep',name])
+            elif name=='quick_overview':
+                # Native quick_overview plots even with mintpy.plot=no. Its
+                # histogram fails on valid all-zero closure maps (bins=0).
+                # Keep native calculations unchanged; our bounded diagnostics
+                # render this plot, including empty and all-zero cases.
+                from mintpy.utils import plot as native_plot
+                original=native_plot.plot_num_triplet_with_nonzero_integer_ambiguity
+                native_plot.plot_num_triplet_with_nonzero_integer_ambiguity=lambda *a,**k:None
+                try:main([str(p/'mintpy.cfg'),'--dostep',name])
+                finally:native_plot.plot_num_triplet_with_nonzero_integer_ambiguity=original
             else:main([str(p/'mintpy.cfg'),'--dostep',name])
             runtime.after_step(job_path,name)
         except Exception as error:
@@ -189,7 +201,47 @@ def invert(job_path):
     ref=validate_reference(job_path,job.get("reference_pixel"));y,x=ref
     with (p/'mintpy.cfg').open('a') as f:f.write(f'mintpy.reference.yx = {y},{x}\n')
     if job.get('parameter_report'):runtime.seal_template(job_path)
-    mintpy_steps(job_path,['reference_point','quick_overview','correct_unwrap_error','invert_network','correct_LOD','correct_SET','correct_ionosphere','correct_troposphere','deramp','correct_topography','residual_RMS','reference_date','velocity'])
+    job=json.loads(job_path.read_text());job['reference_pixel']=ref;save(job_path,job)
+    mintpy_steps(job_path,['reference_point','quick_overview'])
+    diagnostics.build(job_path,'unwrap')
+
+
+def corrections(job_path):
+    job=json.loads(job_path.read_text())
+    diagnostics.verify(job_path.parent,job['review_pending']['report_id'])
+    runtime.validate_external_inputs(job_path)
+    mintpy_steps(job_path,['correct_unwrap_error','invert_network','correct_LOD','correct_SET','correct_ionosphere','correct_troposphere','deramp','correct_topography','residual_RMS'])
+    diagnostics.build(job_path,'residual')
+
+
+def validate_review(job_path, choice):
+    import h5py
+    report=diagnostics.verify(job_path.parent,choice.get('report_id'))
+    choice=diagnostics.decision(report,dict(choice,reviewed=True))
+    if choice['stage']=='residual':
+        config=runtime.resolve_file(job_path.parent/'mintpy.cfg')
+        config['mintpy.timeFunc.excludeDate']=','.join(choice['excluded_dates']) or False
+        config['mintpy.reference.date']=choice['reference_date']
+        with h5py.File(job_path.parent/'timeseries.h5','r') as f:dates=[v.decode() for v in f['date'][:]]
+        runtime.time_model(config,dates,job_path.parent)
+    return choice
+
+
+def finalize(job_path):
+    import h5py
+    p=job_path.parent;job=json.loads(job_path.read_text());choice=job['review_pending']
+    validate_review(job_path,choice)
+    runtime.validate_external_inputs(job_path)
+    # Explicit decisions supersede native residual_RMS suggestion files.
+    # Suggestion files remain as evidence and are never silently consumed.
+    with (p/'mintpy.cfg').open('a') as f:
+        f.write('\nmintpy.timeFunc.excludeDate = '+(','.join(choice['excluded_dates']) or 'no')+'\n')
+        f.write('mintpy.reference.date = '+choice['reference_date']+'\n')
+    job['options']['reference_date']=choice['reference_date'][2:]
+    job['review_velocity_excluded_dates']=choice['excluded_dates'];save(job_path,job)
+    if job.get('parameter_report'):runtime.seal_template(job_path)
+    mintpy_steps(job_path,['reference_date','velocity'])
+    ref=job['reference_pixel']
     # Reference-date correction edits the selected time series; use MintPy's own output selection.
     from mintpy.smallbaselineApp import TimeSeriesAnalysis
     ts=TimeSeriesAnalysis(str(p/'mintpy.cfg'),workDir=str(p));ts.open();files=ts.get_timeseries_filename(ts.template, work_dir=str(p));ts.close()
@@ -260,6 +312,8 @@ if __name__=='__main__':
     if mode=='reference':
         print('RESULT:'+json.dumps(validate_reference(path,json.loads(sys.argv[3]))))
     elif mode=='point':point(path,int(sys.argv[3]),int(sys.argv[4]))
+    elif mode=='validate_review':print('RESULT:'+json.dumps(validate_review(path,json.loads(sys.argv[3]))))
+    elif mode=='spatial':print('RESULT:'+json.dumps(diagnostics.spatial(path,sys.argv[3]),allow_nan=False))
     else:
         try:globals()[mode](path)
         except Exception as e:
