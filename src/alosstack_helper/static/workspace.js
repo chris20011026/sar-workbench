@@ -1,9 +1,15 @@
 // One navigation and history surface; each scientific adapter keeps its own state.
 (()=>{
  window.workspaceReady=true;
+ // Fixed local icon vocabulary; all data labels continue to use textContent.
+ const iconPaths={overview:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',plus:'<path d="M12 4v16M4 12h16"/>',layers:'<path d="m3 8 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 18l9 5 9-5"/>',tools:'<path d="M14 6a5 5 0 0 0-6 6L3 17l4 4 5-5a5 5 0 0 0 6-6l-3 3-4-4 3-3Z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01"/>',folder:'<path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',review:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',chart:'<path d="M4 3v17h17M6 15l5-6 4 3 5-7"/>',map:'<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5ZM9 3v16M15 5v16"/>',log:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',check:'<path d="m5 12 4 4L20 5"/>',arrow:'<path d="M4 12h15m-5-5 5 5-5 5"/>',satellite:'<path d="m8 6 10 10-4 4L4 10 8 6Zm9-3 4 4-4 4-4-4 4-4ZM3 13l4 4-4 4-4-4M15 13l4-4M12 17l-4 4"/>'};
+ function icon(name){const box=node('span',undefined,'ui-icon');box.setAttribute('aria-hidden','true');box.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+(iconPaths[name]||iconPaths.layers)+'</svg>';return box;}
+ window.workbenchIcon=icon;
+ for(const [id,name] of [['openOverview','overview'],['newProject','plus'],['openLibrary','layers'],['openWelcome','tools'],['openHelp','help']]){const b=$(id);if(b){const label=node('span',b.textContent.replace(/^＋\s*/,''));b.replaceChildren(icon(name),label);}}
+
  const main=document.querySelector('main');
  const dashboard=node('section');dashboard.id='workspaceOverview';dashboard.hidden=true;
- dashboard.innerHTML=`<div class="ws-heading"><div><div class="eyebrow">RESEARCH WORKSPACE</div><h1>研究專案總覽</h1><p class="intro">在同一處查看資料準備、干涉處理與時間序列。選擇工作，接續目前的階段。</p></div><button id="overviewCreate" class="primary">＋ 建立專案</button></div>
+ dashboard.innerHTML=`<div class="ws-heading"><div><div class="eyebrow">RESEARCH WORKSPACE</div><h1>研究專案總覽</h1><p class="intro">從目前的關卡接著做，資料與判讀紀錄都留在專案中。</p></div><button id="overviewCreate" class="primary">＋ 建立專案</button></div>
  <div id="overviewMetrics" class="ws-metrics"></div><div class="ws-toolbar"><label>搜尋工作<input id="overviewSearch" type="search" placeholder="專案、流程或資料夾"></label><label>狀態<select id="overviewStatus"><option value="">全部狀態</option><option value="running">進行中</option><option value="attention">需要處理</option><option value="ready">等待開始</option><option value="complete">已完成</option><option value="unavailable">離線／位置無法讀取</option></select></label><label>類型<select id="overviewKind"><option value="">全部工作</option><option value="project">ISCE2 專案</option><option value="nisar">NISAR 專案</option><option value="analysis">MintPy／品質報告</option><option value="conversion">格式轉換</option><option value="alos_preparation">ALOS 批次準備</option><option value="preparation">資料準備／教學</option></select></label><button id="overviewReload">更新紀錄</button></div><p id="overviewMessage" role="status" class="hint"></p><div id="overviewRecords" class="ws-records"></div>`;
  const chooser=node('section');chooser.id='workspaceCreate';chooser.hidden=true;
  chooser.innerHTML=`<div class="eyebrow">NEW RESEARCH PROJECT</div><h1>從資料選擇合適的流程。</h1><p class="intro">先辨識資料，再選擇研究目標。熟悉資料的使用者，也可以直接選擇下方流程。</p>
@@ -47,25 +53,25 @@
   $('overviewMessage').textContent=`顯示 ${selected.length} / ${snapshot.records.length} 筆工作。`+(snapshot.warnings.length?' '+snapshot.warnings.join('；'):'');
   if(!selected.length){showEmpty(box,snapshot.records.length?'沒有符合條件的工作':'還沒有研究專案',snapshot.records.length?'清除篩選':'建立第一個專案',snapshot.records.length?()=>{$('overviewSearch').value='';$('overviewStatus').value='';$('overviewKind').value='';drawRecords();}:window.openWorkspaceCreate);return;}
   for(const r of selected){
-   const card=node('article',undefined,'card ws-record');card.append(node('span',r.status_label,'ws-status '+r.group),node('p',r.workflow||'專案紀錄','eyebrow'),node('h2',r.name));
+   const card=node('article',undefined,'card ws-record');card.setAttribute('data-group',r.group);const recordTop=node('div',undefined,'ws-record-top'),kindIcon=icon(r.kind==='analysis'?'chart':r.kind==='conversion'?'layers':'folder');kindIcon.className+=' ws-record-icon';recordTop.append(kindIcon,node('span',r.status_label,'ws-status '+r.group));card.append(recordTop,node('p',r.workflow||'專案紀錄','eyebrow'),node('h2',r.name));
    card.append(node('p',r.stage||'等待查看紀錄','ws-stage'));
-   if(r.path)card.append(node('p',r.path,'ws-path'));
+   const location=node('details',undefined,'ws-location');location.append(node('summary','位置與運算環境'));if(r.path)location.append(node('p',r.path,'ws-path'));if(r.environment)location.append(node('p',r.environment,'ws-path'));if(r.path||r.environment)card.append(location);
    if(r.notes)card.append(node('p',r.notes,'ws-project-notes'));
    if(r.storage?.volume)card.append(node('p','儲存裝置：'+r.storage.volume.label,'hint'));
    if(r.storage?.relocated)card.append(node('p','位置已重新連結 · 啟動運算前仍需確認內部路徑。','notice'));
-   if(r.environment){const details=node('details');details.append(node('summary','運算環境'),node('p',r.environment,'ws-path'));card.append(details);}
+
    if(r.error)card.append(node('p',r.error,'ws-error'));
    const footer=node('div',undefined,'ws-record-footer');
    footer.append(node('span',r.updated?new Date(r.updated*1000).toLocaleString('zh-TW'):'未記錄時間','hint'));
    const actions=node('div',undefined,'ws-record-actions');
-   if(r.action)actions.append(button(['running','attention'].includes(r.group)?'查看目前階段':'開啟工作',()=>route(r.action)));
+   if(r.action){const open=button(['running','attention'].includes(r.group)?'接續目前階段':'開啟工作',()=>route(r.action),'primary');open.append(icon('arrow'));actions.append(open);}
    if(r.registration){const manage=button(r.status==='relocated'?'確認找到的位置':'管理專案',()=>window.openProjectManager(r.registration.id));manage.setAttribute('aria-label','管理專案「'+r.name+'」');actions.append(manage);const remove=button('從工作台移除',()=>askRemove(r),'ws-remove-button');remove.disabled=r.registration.busy;remove.setAttribute('aria-label','從工作台移除「'+r.name+'」');if(remove.disabled)remove.title='請先等待專案與分析運算完成，或停止工作。';actions.append(remove);}
    footer.append(actions);
    if(!r.action)card.append(node('p',r.status==='offline'?'接回磁碟後，本頁會自動重新檢查。':r.status==='relocated'?'已核對磁碟與專案代號，請在管理專案中確認新位置。':'可在管理專案重新選擇資料夾；不需要的紀錄也可移除。','hint'));
    card.append(footer);box.append(card);
   }
  }
- function drawMetrics(){const box=$('overviewMetrics');box.replaceChildren();for(const [group,label,value] of [['','全部工作',snapshot.records.length],['running','進行中',snapshot.counts.running],['attention','需要處理',snapshot.counts.attention],['complete','已完成',snapshot.counts.complete]]){const b=button('',()=>{$('overviewStatus').value=group;drawRecords();},'ws-metric');b.append(node('strong',String(value)),node('span',label));box.append(b);}}
+ function drawMetrics(){const box=$('overviewMetrics');box.replaceChildren();for(const [group,label,value,name] of [['','全部工作',snapshot.records.length,'folder'],['running','進行中',snapshot.counts.running,'clock'],['attention','需要處理',snapshot.counts.attention,'review'],['complete','已完成',snapshot.counts.complete,'check']]){const b=button('',()=>{$('overviewStatus').value=group;drawRecords();},'ws-metric');b.setAttribute('data-group',group);b.append(icon(name),node('strong',String(value)),node('span',label));b.setAttribute('aria-label',label+' '+value+' 筆，按此篩選');box.append(b);}}
  function loadOverview(){if(loading)return loading;loading=(async()=>{try{const next=await api('/api/workspace');const changed=JSON.stringify(next)!==JSON.stringify(snapshot);snapshot=next;flows=snapshot.workflows;window.workspaceMigrationUpdate?.(next.migration);if(changed){drawMetrics();drawRecords();drawRemoved();}else if($('overviewMessage').dataset.failed){drawRecords();}delete $('overviewMessage').dataset.failed;}catch(e){$('overviewMessage').dataset.failed='true';$('overviewMessage').textContent='暫時無法更新；保留上次顯示的紀錄。'+e.message;}finally{loading=null;}})();return loading;}
  async function reloadRegistry(){if(loading)await loading;await loadOverview();}
  window.refreshWorkspaceRegistry=reloadRegistry;
@@ -98,7 +104,7 @@
    const compatible=!probe||probe.eligible.includes(f.id),enabled=f.available&&compatible;
    const card=node('article',undefined,'ws-flow'+(enabled?'':' ws-unavailable'));
    const top=node('div',undefined,'ws-flow-top');top.append(node('span',f.engine,'eyebrow'),node('span',maturity[f.maturity],'ws-status '+f.maturity));
-   card.append(top,node('h3',f.name),node('p',f.description));
+   card.append(top);const diagram=node('div',undefined,'ws-flow-diagram');diagram.setAttribute('aria-hidden','true');const scenes=node('div',undefined,'ws-scenes '+flowGoal(f));for(let i=0;i<(flowGoal(f)==='stack'?4:flowGoal(f)==='pair'?2:1);i++)scenes.append(node('i'));diagram.append(scenes,icon('arrow'),icon(flowGoal(f)==='stack'?'chart':flowGoal(f)==='pair'?'map':'layers'));card.append(diagram,node('h3',f.name),node('p',f.description));
    if(probe&&!compatible&&f.available)card.append(node('p',probe.pending?'等待辨識結果…':'目前辨識的資料不適用此入口。','hint'));
    const b=button(f.maturity==='preparation'?'前往資料準備':f.available?'設定這個流程':'尚未開放',()=>begin(f),'primary');b.disabled=!enabled;card.append(b);box.append(card);
   }
@@ -182,4 +188,22 @@
  }
  action($('environmentRefresh'),window.loadEnvironmentPanel);
  window.openWorkspaceOverview().catch(fail);
+
+ // Keep every section available; navigation only scrolls to the requested evidence.
+ const projectNav=node('nav',undefined,'project-navigation');projectNav.id='projectNavigation';projectNav.setAttribute('aria-label','專案頁面區段');
+ const statusCard=$('project').querySelector('.card');statusCard.id='projectStatusCard';
+ const settingsCard=$('project').querySelector('.project-settings');settingsCard.id='projectSettingsSection';
+ const logCard=$('log').closest('.card');logCard.id='projectLogSection';
+ $('projectPath').after(projectNav);let navSignature='',sectionObserver=null;
+ const sectionVisible=el=>!!el&&!el.hidden&&!el.closest('[hidden]');
+ function jumpTo(id){const target=$(id);if(!target)return;let ancestor=target;while(ancestor&&ancestor!==$('project')){if(ancestor.tagName==='DETAILS')ancestor.open=true;ancestor=ancestor.parentElement;}target.setAttribute('tabindex','-1');target.focus({preventScroll:true});target.scrollIntoView({behavior:window.matchMedia?.('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});}
+ window.projectNavigationUpdate=s=>{
+  const acceptance=s.status==='ion_correction_review'?'校正後確認':'成果驗收';
+  const sections=[['projectStatusCard','進度','clock'],['samplingReview','影格與取樣','map'],['matchingQuality','匹配品質','review'],['review','電離層','layers'],['alosAcceptance',acceptance,'check'],['pairWorkbench','雙日期成果','map'],['topsWorkbench','TOPS 成果','map'],['analysisWorkbench','MintPy','chart'],['researchStudio','比較與報告','chart'],['projectSettingsSection','設定','tools'],['projectLogSection','日誌','log']].filter(([id])=>sectionVisible($(id)));
+  const signature=s.id+':'+s.status+':'+sections.map(x=>x[0]).join(',');if(signature===navSignature)return;navSignature=signature;sectionObserver?.disconnect();projectNav.replaceChildren();
+  const gate={sampling_review:'samplingApproval',sampling_ready:'samplingMatchApproval',matching_review:'matchingDecision',review:'review',ion_correction_review:'alosAcceptance',output_review:'alosAcceptance',failed:'recoveryCenter'}[s.status];
+  if(gate&&sectionVisible($(gate))){const next=button('目前關卡',()=>jumpTo(gate),'project-nav-current');next.prepend(icon('review'));projectNav.append(next);}
+  for(const [id,label,name] of sections){const b=button(label,()=>jumpTo(id));b.setAttribute('data-section',id);b.prepend(icon(name));projectNav.append(b);}
+  if(typeof IntersectionObserver!=='undefined'){sectionObserver=new IntersectionObserver(entries=>{const top=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top)[0];if(!top)return;for(const b of projectNav.querySelectorAll('[data-section]')){const current=b.getAttribute('data-section')===top.target.id;b.classList.toggle('selected',current);if(current)b.setAttribute('aria-current','location');else b.removeAttribute('aria-current');}},{rootMargin:'-70px 0px -60% 0px',threshold:0});for(const [id] of sections)sectionObserver.observe($(id));}
+ };
 })();

@@ -1,6 +1,6 @@
 # SAR 研究工作台（SAR Workbench）
 
-本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.8.0 beta 5**，新增電離層校正後確認、cmd4 成果驗收與 MintPy 診斷判讀關卡，並保留 ALOS 批次準備、成果比較、研究報告與手動成果匯入。
+本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.8.0 beta 6**，新增已知答案的進階自測、MintPy 階段恢復與圖像化工作導覽；保留電離層校正後確認、cmd4 驗收及 MintPy 人工判讀。
 
 - **[相容性與匹配品質](docs/ALOS_QUALITY.md)**：本版新增選用影格的波長／頻寬／Doppler 摘要，以及 cmd1 匹配完成後、cmd2 前的獨立人工關卡。這些診斷不等於真實跨衛星科學驗證。
 - **[日常操作、備份與故障排查](docs/OPERATIONS.md)**：網頁側欄也有離線說明；已安裝的工作台不依賴 ChatGPT／Codex 訂閱。
@@ -29,7 +29,7 @@
 
 **第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/latest) 取得已發布的 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
-[第一次使用指南](docs/FIRST_USE.md) · [0.8 beta 5 更新](docs/RELEASE_0.8_BETA5.md) · [0.8 beta 4 更新](docs/RELEASE_0.8_BETA4.md) · [0.8 版本紀錄](docs/RELEASE_0.8.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
+[第一次使用指南](docs/FIRST_USE.md) · [0.8 beta 6 更新](docs/RELEASE_0.8_BETA6.md) · [進階自測](docs/ADVANCED_SELFTEST.md) · [0.8 beta 5 更新](docs/RELEASE_0.8_BETA5.md) · [0.8 beta 4 更新](docs/RELEASE_0.8_BETA4.md) · [0.8 版本紀錄](docs/RELEASE_0.8.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
 「工具與環境」提供合成教學、ALOS-2 ZIP／資料夾匯入與公開地形下載。真實 SAR 影像仍需自行取得，科學參考點與電離層品質仍需判讀。自動安裝使用 [insar-arm](https://github.com/chris20011026/insar-arm) 的固定套件，放在工作台專用資料夾；既有 Conda 環境與研究專案保持原設定。
 

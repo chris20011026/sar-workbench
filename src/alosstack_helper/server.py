@@ -41,6 +41,7 @@ from .reports import Reports
 from .legacy import LegacyImports
 from .tops_validation import TopsValidation
 from .sampling_review import SamplingReviews
+from .selftest import SelfTests
 from . import DISPLAY_VERSION
 
 STATIC = Path(__file__).parent/'static'
@@ -65,6 +66,7 @@ def make_server(engine, port=8765):
     legacy = LegacyImports(engine)
     tops_validation = TopsValidation(engine)
     sampling_reviews = SamplingReviews(engine)
+    selftests = SelfTests(engine)
     library = Library(engine.home)
     nisar_jobs = NisarJobs(engine.home)
     conversion_jobs = manager_type()(engine.home)
@@ -75,7 +77,7 @@ def make_server(engine, port=8765):
     confirmations = Confirmations()
     storage_usage = StorageUsage(engine)
     migrations = Migrations(engine)
-    migration_writes = ('/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/create',
+    migration_writes = ('/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/analysis-recover', '/api/selftest-start', '/api/create',
                         '/api/project-remove', '/api/project-attach', '/api/recovery-enable',
                         '/api/analysis-rename', '/api/analysis-spatial', '/api/survey', '/api/geo-view', '/api/geo-point',
                         '/api/geo-export', '/api/geo-figure', '/api/setup-start', '/api/demo-start',
@@ -104,7 +106,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css', '/sampling.js', '/sampling.css', '/alos-acceptance.js', '/mintpy-diagnostics.js', '/mintpy-diagnostics.css'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css', '/sampling.js', '/sampling.css', '/alos-acceptance.js', '/mintpy-diagnostics.js', '/mintpy-diagnostics.css', '/operations.js', '/operations.css'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -115,6 +117,8 @@ def make_server(engine, port=8765):
                         data = data.replace(b'__VERSION__', DISPLAY_VERSION.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
+                if u.path == '/api/selftest': return self.send(selftests.status())
+                if u.path == '/api/selftest-report': return self.send(selftests.report())
                 if u.path == '/api/sampling-preview-image':
                     return self.send(sampling_reviews.image(q['id'][0], q['image'][0]), mime='image/png')
                 if u.path == '/api/alos-preparation':
@@ -154,7 +158,7 @@ def make_server(engine, port=8765):
                 if u.path == '/api/onboarding-job': return self.send(onboarding.job(q.get('job', [''])[0]))
                 if u.path == '/api/state':
                     nisar_jobs.reconcile(); conversion_jobs.reconcile(); alos_batches.reconcile()
-                    return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy())})
+                    return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or selftests.status().get('status')=='running')})
                 if u.path == '/api/tops-schema':return self.send({'fields':TOPS_FIELDS})
                 if u.path == '/api/pair-schema':return self.send({'fields':FIELDS})
                 if u.path == '/api/mintpy-schema':return self.send(catalogue(q.get('environment',[None])[0] or None))
@@ -173,6 +177,7 @@ def make_server(engine, port=8765):
                     return self.send(p.read_bytes(),mime=mimetypes.guess_type(p.name)[0] or 'application/octet-stream')
                 if u.path == '/api/analyses': return self.send({'runs':analyses.listing(key)})
                 if u.path == '/api/analysis': return self.send(analyses.details(key,q['run'][0]))
+                if u.path == '/api/analysis-recovery': return self.send(analyses.recovery_report(key,q['run'][0]))
                 if u.path in ('/api/analysis-artifact','/api/tops-artifact'):
                     p=TopsWorkflow(engine).artifact(s,q['file'][0]) if u.path=='/api/tops-artifact' else analyses.artifact(key,q['run'][0],q['file'][0])
                     self.send_response(200)
@@ -221,6 +226,14 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/selftest-stop':
+                    selftests.stop(); return self.send(selftests.status())
+                if selftests.status().get('status') == 'running' and self.path in launches_for_alos_guard:
+                    raise ValueError('進階自測正在使用運算工具；請等待完成或先停止自測。')
+                if self.path == '/api/selftest-start':
+                    if engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or onboarding.runtime.status().get('status') == 'running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先完成目前運算、安裝或搬移，再開始進階自測。')
+                    return self.send(selftests.start(d.get('environment') or defaults()['env']))
                 if self.path in ('/api/sampling-review', '/api/sampling-preview', '/api/matching-review', '/api/alos-review', '/api/alos-review-preview'):
                     if engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or onboarding.runtime.status().get('status') == 'running' or any(j['status'] == 'running' for j in onboarding.jobs.values()):
                         raise ValueError('請等待目前運算、安裝或搬移結束，再載入影格預覽。')
@@ -299,7 +312,7 @@ def make_server(engine, port=8765):
                     if engine.active or nisar_jobs.active or conversion_jobs.active or onboarding.runtime.status().get('status')=='running' or any(j['status']=='running' for j in onboarding.jobs.values()):
                         raise ValueError('請等目前的運算或安裝工作結束，再驗證環境。')
                     return self.send(environment_checks.run(d['path'], defaults()['environments']))
-                if (nisar_jobs.active or conversion_jobs.active) and self.path in ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/demo-start', '/api/terrain-start', '/api/import-start'):
+                if (nisar_jobs.active or conversion_jobs.active) and self.path in ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/analysis-recover', '/api/demo-start', '/api/terrain-start', '/api/import-start'):
                     raise ValueError('請先完成或停止實驗室中的工作。')
                 if self.path in ('/api/nisar-create', '/api/nisar-run'):
                     if engine.active or conversion_jobs.active or onboarding.runtime.status().get('status') == 'running' or any(j['status']=='running' for j in onboarding.jobs.values()):
@@ -361,6 +374,10 @@ def make_server(engine, port=8765):
                     return self.send(s)
                 if self.path == '/api/analysis-create':
                     return self.send(analyses.create(d['id'],d['kind'],d))
+                if self.path == '/api/analysis-recover':
+                    if onboarding.runtime.status().get('status') == 'running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先完成運算工具安裝或資料準備，再恢復 MintPy 分析。')
+                    return self.send(analyses.recover(d['id'],d['run'],d))
                 if self.path == '/api/analysis-invert':
                     return self.send(analyses.invert(d['id'],d['run'],d))
                 if self.path == '/api/analysis-review':
@@ -393,6 +410,7 @@ def make_server(engine, port=8765):
             except Exception as e: self.send({'error':str(e)},400)
     class Server(ThreadingHTTPServer):
         def server_close(self):
+            selftests.shutdown()
             alos_batches.shutdown()
             comparisons.shutdown()
             reports.shutdown()
@@ -413,6 +431,7 @@ def make_server(engine, port=8765):
     server.tops_validation = tops_validation
     server.sampling_reviews = sampling_reviews
     server.analyses = analyses
+    server.selftests = selftests
     return server
 
 def main():
@@ -442,6 +461,7 @@ def main():
         atomic_json(args.desktop_session, {'url':url, 'pid':os.getpid()})
     if not args.no_browser: webbrowser.open(url)
     def shutdown(*_):
+        server.selftests.shutdown()
         server.migrations.stop()
         server.storage_usage.stop(shutdown=True)
         server.nisar_jobs.stop(shutdown=True)

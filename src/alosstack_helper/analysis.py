@@ -6,6 +6,7 @@ from .environment import isolated_env
 from .workflows import inventory, options
 from .storage import atomic_existing_json
 from . import mintpy_diagnostics as diagnostics
+from .analysis_recovery import AnalysisRecovery, unfinished_recovery_alive
 
 WORKER=Path(__file__).with_name('science_worker.py')
 
@@ -72,9 +73,11 @@ class Analyses:
                     except ProcessLookupError:pass
                     except (ValueError,PermissionError):return
                     else:return  # Existing process is left alone; reserve rejects a second job.
-                job=self.get(key,item['id']);job.update(status='failed',stage='服務曾中斷',error='保留現有輸出。請檢查分析日誌後建立新版本，不會自動接續半成品。');atomic_existing_json(p/'analysis.json',job)
+                job=self.get(key,item['id']);job.update(status='failed',stage='服務曾中斷',error='保留現有輸出。請檢查分析日誌；有完整階段副本時可建立恢復版本，不會自動接續半成品。');atomic_existing_json(p/'analysis.json',job)
     def reserve(self):
         self.reconcile()
+        if any(unfinished_recovery_alive(self.base(s['id'])) for s in self.engine.list()):
+            raise ValueError('仍有分析恢復程序存活，未完成版本保持隱藏；請先等待原程序結束。')
         if any(r['status']=='running' for s in self.engine.list() for r in self.listing(s['id'])):
             raise ValueError('仍有背景分析，請確認原本的工作已結束。')
         if self.engine.active:raise ValueError('已有工作執行中，請等待完成。')
@@ -130,6 +133,8 @@ class Analyses:
                 lines=result.stderr.splitlines()+result.stdout.splitlines()
                 message=next((x.partition('ValueError: ')[2] for x in lines if 'ValueError: ' in x),'參考點檢查失敗，請選擇共同有效陸地。')
                 raise ValueError(message)
+            values=[line[7:] for line in result.stdout.splitlines() if line.startswith('RESULT:')]
+            if values:ref=json.loads(values[-1])
             job['reference_pixel']=ref;job.update(status='running',stage='準備反演',error='')
             atomic_json(p/'analysis.json',job);self.engine.active=key+':'+run;self.engine.cancel.clear()
             threading.Thread(target=self.worker,args=(key,run,'invert'),daemon=True).start()
@@ -186,10 +191,14 @@ class Analyses:
         p=None;job=None;process=None
         try:
             p=self.folder(key,run);job=self.get(key,run)
+            if job.get('kind')=='mintpy':
+                job=AnalysisRecovery(self,key,run).capture(job,mode)
             cache=p/'cache';cache.mkdir(exist_ok=True)
             with (p/'run.log').open('a') as log:
                 command=self.command(job,[mode,str(p/'analysis.json')])
-                process=subprocess.Popen(command,cwd=p,env=clean_env(cache),stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+                # Scientific workers are non-interactive. A regular-file stdin
+                # can also be misread by native helpers that treat False as fd 0.
+                process=subprocess.Popen(command,cwd=p,env=clean_env(cache),stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
                 self.engine.process=process
                 (p/'worker.pid').write_text(str(process.pid))
                 if self.engine.cancel.is_set():os.killpg(process.pid,signal.SIGTERM)
@@ -197,7 +206,7 @@ class Analyses:
             job=self.get(key,run)
             if code or self.engine.cancel.is_set():
                 detail=failure_detail(p/'run.log') if code and not self.engine.cancel.is_set() else ''
-                raise RuntimeError((detail+'。' if detail else '')+f'分析停止（結束碼 {code}），已保留輸出與日誌，可另建版本。')
+                raise RuntimeError((detail+'。' if detail else '')+f'分析停止（結束碼 {code}），已保留輸出與日誌；可檢查階段副本後建立恢復版本。')
             if fingerprint(job['inventory']['files'])!=job['source_fingerprint']:raise RuntimeError('分析期間來源檔案改變，結果不能標示完成。')
             states={'load':('loaded','資料已載入，等待確認參考點'),
                     'invert':('diagnostic_review','等待判讀配對網路、閉合統計與連通區'),
@@ -225,6 +234,80 @@ class Analyses:
                                  error='分析狀態無法寫回，已在本機保留紀錄。接回磁碟後可查看產物並另建分析版本；不會自動續跑。 '+str(error)))
             finally:
                 with self.engine.lock:self.engine.active=None;self.engine.process=None
+    def recovery_report(self,key,run):
+        self.reconcile()
+        return AnalysisRecovery(self,key,run).report()
+
+    def recover(self,key,run,data):
+        if data.get('reviewed') is not True:raise ValueError('請先確認恢復摘要，再建立新版本。')
+        if not data.get('checkpoint_id'):raise ValueError('請先檢查恢復點。')
+        with self.engine.lock:
+            self.reserve();self.engine.cancel.clear()
+            new_id=uuid.uuid4().hex[:12];destination=self.folder(key,new_id)
+            reservation=key+':recovery:'+new_id
+            recovery=AnalysisRecovery(self,key,run,reservation=reservation)
+            self.engine.active=reservation
+            staging=self.base(key)/'.recovery-staging';container=None;process=None;published=False;claimed=False
+            try:
+                if staging.is_symlink():raise ValueError('分析恢復暫存資料夾不可是符號連結。')
+                staging.mkdir(exist_ok=True);candidate=staging/new_id;candidate.mkdir();container=candidate
+                operation=dict(server_pid=os.getpid(),source_run=run,new_id=new_id,created=time.strftime('%Y-%m-%d %H:%M:%S'))
+                atomic_existing_json(container/'operation.json',operation)
+                temporary=container/'data'
+                job,report=recovery.restore(data['checkpoint_id'],temporary,new_id,published=destination)
+                # The helper changes copied metadata paths only, never values
+                # in raster datasets or the original failed analysis.
+                if report['status']!='ready':
+                    helper=Path(__file__).with_name('analysis_recovery_worker.py')
+                    command=self.command(job,[])
+                    command[-1:]=[str(helper),str(temporary),str(recovery.folder),str(destination)]
+                    cache=temporary/'cache';cache.mkdir(exist_ok=True)
+                    process=subprocess.Popen(command,cwd=temporary,env=clean_env(cache),stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,start_new_session=True)
+                    self.engine.process=process
+                    operation['worker_pid']=process.pid;atomic_existing_json(container/'operation.json',operation)
+                    if self.engine.cancel.is_set():os.killpg(process.pid,signal.SIGTERM)
+                    stdout,stderr=process.communicate(timeout=240)
+                    if process.returncode:raise ValueError('恢復版本的描述檔路徑驗證失敗：'+(stderr or stdout)[-900:])
+                    recovery.cancelled()
+                    job=json.loads((temporary/'analysis.json').read_text())
+                    diagnostic=temporary/'diagnostics.json'
+                    if diagnostic.exists():
+                        previous=json.loads(diagnostic.read_text());old_receipt=previous.pop('report_id',None)
+                        previous.pop('evidence',None)
+                        previous['recovered_from']=dict(analysis_id=run,report_id=old_receipt)
+                        diagnostics.seal(temporary,previous)
+                    # Preserve previous decisions as history; the current gate
+                    # is deliberately shown again with a newly sealed report.
+                    job['stage']=report['label']+'（由完整副本恢復，請重新確認）'
+                else:
+                    job.update(status='running',stage='從完整起點重新載入資料')
+                atomic_existing_json(temporary/'analysis.json',job)
+                recovery.validate(data['checkpoint_id']);recovery.cancelled()
+                # Publish only after rebasing and receipt validation finish.
+                # A terminated server leaves private nested staging, never an
+                # apparently usable loaded/review version in the public list.
+                destination.mkdir();claimed=True;temporary.rename(destination);published=True
+                operation['published']=True;atomic_existing_json(container/'operation.json',operation)
+                shutil.rmtree(container,ignore_errors=True);container=None
+                if report['status']=='ready':
+                    self.engine.active=key+':'+new_id
+                    self.engine.process=None
+                    threading.Thread(target=self.worker,args=(key,new_id,'load'),daemon=True).start()
+                else:self.engine.active=None;self.engine.process=None
+                return job
+            except BaseException:
+                if process and process.poll() is None:
+                    try:os.killpg(process.pid,signal.SIGTERM);process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:os.killpg(process.pid,signal.SIGKILL);process.wait()
+                    except ProcessLookupError:pass
+                if self.engine.active in (reservation,key+':'+new_id):self.engine.active=None
+                self.engine.process=None
+                if container is not None:shutil.rmtree(container,ignore_errors=True)
+                if published:
+                    job.update(status='failed',stage='恢復版本啟動中斷',error='完整副本已保留；請由原失敗分析重新建立恢復版本。')
+                    atomic_existing_json(destination/'analysis.json',job)
+                elif claimed and destination.is_dir() and not any(destination.iterdir()):destination.rmdir()
+                raise
     def details(self,key,run):
         p=self.folder(key,run);job=self.get(key,run)
         for name in ('quality','loaded','results','diagnostics'):

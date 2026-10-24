@@ -81,6 +81,9 @@ def main():
     report = smoke(a.home, a.bundled_source, a.home/'runtime/miniforge/bin/python')
     from alosstack_helper.runtime import ready_environment
     os.environ['ALOSSTACK_TEST_ENV'] = str(ready_environment(a.home))
+    # Run the same known-answer native science suite shipped in the workbench,
+    # including injected errors. Lightweight non-science unit CI skips it.
+    os.environ['ALOSSTACK_ADVANCED_SELFTEST'] = '1'
     tests = unittest.defaultTestLoader.discover(str(ROOT/'tests'))
     result = unittest.TextTestRunner(verbosity=2).run(tests)
     report.update(tests=result.testsRun, skipped=len(result.skipped), passed=result.wasSuccessful())

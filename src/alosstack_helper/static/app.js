@@ -98,7 +98,7 @@ statusNames.pair_ready='等待開始干涉';
 function renderStackTimeline(s){
  const steps=[['new','準備專案'],...(s.config.sampling_equalization?[['sampling_review','影格與取樣'],['sampling_ready','取樣成果'],['matching_review','匹配品質']]:[['ready','干涉處理']]),...(s.ion?.estimate===false?[]:[['review','電離層估計'],...(s.ion?.apply===false?[]:[['ion_correction_review','校正後檢查']])]),['output_review','cmd4 成果驗收'],['complete','後續分析']];
  const timeline=$('timeline');timeline.setAttribute('aria-label','處理流程與人工檢查點');
- for(const [i,[state,label]] of steps.entries()){const item=node('div',`${i+1}  ${label}`,s.status===state?'selected':'');if(s.status===state)item.setAttribute('aria-current','step');timeline.append(item);}
+ for(const [i,[state,label]] of steps.entries()){const item=node('div',undefined,s.status===state?'selected':'');item.append(node('b',String(i+1).padStart(2,'0')),node('span',label));if(s.status===state)item.setAttribute('aria-current','step');timeline.append(item);}
 }
 function summary(s){$('summary').replaceChildren();const c=s.config;for(const [k,v] of Object.entries({'資料來源':c.source,...(c.workflow==='topsApp'?{'比較影像':c.secondary_safe,'子波束':c.swaths.join('、'),'極化':c.polarization,'選區':c.roi?.join('、')||'完整共同範圍'}:{}),'資料使用方式':c.copy?'複製與驗證':'直接讀取','參考日期':c.reference,...(c.workflow==='alos2App'?{'比較日期':c.secondary,'frame':c.frames.join('、'),'地理編碼範圍':c.bbox?.join('、')||'使用參考影像範圍'}:{}),'環境':c.env,'對位 DEM':c.dem,'地理編碼 DEM':c.dem_geo,'水體遮罩':c.wbd,...c.properties,...(s.ion?{'本次電離層估計':s.ion.estimate==null?'未記錄':s.ion.estimate?'啟用':'關閉','本次套用校正':s.ion.apply==null?'未記錄':s.ion.estimate&&s.ion.apply?'啟用':'不執行',...(c.workflow==='alos2App'?{}:{'本次一般配對數':s.ion.subsequent,'本次電離層配對數':s.ion.subsequent_ion})}:{}),...Object.fromEntries(Object.entries(s.looks||{}).filter(([k])=>k.includes('lks')).map(([k,v])=>['本次生成 '+k,v]))})){$('summary').append(node('dt',labels[k]||k),node('dd',v));}}
 let refreshGeneration=0,reviewGeneration=0,reviewInFlight=null,reviewViewport=null,reviewSubmitting=false;
@@ -120,8 +120,8 @@ async function refresh(){
  const s=projects.find(x=>x.id===key);if(!s){await window.projectBecameUnavailable?.();return;}
  syncIonReview(s);$('setup').hidden=true;$('project').hidden=false;$('crumb').textContent=s.display_name||s.config.name;$('projectName').textContent=s.display_name||s.config.name;$('projectPath').textContent=s.config.root;$('status').textContent=statusNames[s.status];$('stage').textContent=s.stage;$('error').textContent=s.error||'';summary(s);window.samplingUpdate?.(s,data);window.alosAcceptanceUpdate?.(s,data);$('timeline').hidden=!!s.import_only;window.topsValidationUpdate?.(s,data);window.researchUpdate?.(s,data);window.projectStorageUpdate?.(s,data);
  $('history').replaceChildren();for(const h of s.history)$('history').append(node('p',h.time+' · '+h.stage,'hint'));if($('topsWorkbench'))$('topsWorkbench').hidden=s.config.workflow!=='topsApp';
- if(s.config.workflow==='topsApp'){await window.topsUpdate(s,data);if(current===key&&generation===refreshGeneration)await refreshLog();return;}
- if(s.config.workflow==='alos2App'){await window.pairUpdate(s,data);if(current===key&&generation===refreshGeneration)await refreshLog();return;}
+ if(s.config.workflow==='topsApp'){await window.topsUpdate(s,data);if(current===key&&generation===refreshGeneration){await refreshLog();window.projectNavigationUpdate?.(s);}return;}
+ if(s.config.workflow==='alos2App'){await window.pairUpdate(s,data);if(current===key&&generation===refreshGeneration){await refreshLog();window.projectNavigationUpdate?.(s);}return;}
  if($('pairWorkbench'))$('pairWorkbench').hidden=true;$('timeline').replaceChildren();$('timeline').hidden=!!s.import_only;renderStackTimeline(s);$('actions').replaceChildren();
  const add=(text,a)=>{const b=node('button',text,'primary');b.disabled=Boolean(data.busy||s.storage?.relocated);action(b,async()=>{if(current!==key||b.disabled)return;b.disabled=true;try{if(a==='run'){await window.confirmProcessing(key);return;}await api('/api/action',{id:key,action:a});await refresh();}finally{b.disabled=false;}});$('actions').append(b);};
  if(s.status==='new')add('確認設定，準備資料與指令','prepare');
@@ -131,7 +131,7 @@ async function refresh(){
  $('review').hidden=s.status!=='review';$('continue').disabled=!ionReviewCanContinue();$('continue').textContent=s.ion?.apply===false?'確認判讀，保留估計並跑 cmd4（不套用校正） →':'套用校正，前往校正後檢查 →';
  if(s.status==='review'&&reviewLoaded!==key){try{await renderReview(key);}catch(e){if(current===key)fail(e);}}
  if(generation!==refreshGeneration||current!==key)return;
- await Promise.all([refreshLog(),window.workbenchUpdate?.(s,data)]);
+ await Promise.all([refreshLog(),window.workbenchUpdate?.(s,data)]);if(generation===refreshGeneration&&current===key)window.projectNavigationUpdate?.(s);
 }
 let logProject=null,logGeneration=0;
 async function refreshLog(){
