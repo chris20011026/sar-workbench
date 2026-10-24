@@ -10,7 +10,7 @@
  panel.innerHTML=`<div class="operation-heading"><span class="operation-icon" aria-hidden="true">◎</span><div><div class="eyebrow">WORKBENCH HEALTH</div><h2>進階功能自測</h2><p class="muted">用有已知答案的小型資料，確認這台電腦能完成分析與匯出。</p></div><span id="selftestBadge" class="badge">尚未執行</span></div>
  <div class="selftest-route" aria-label="自測範圍"><span><b>01</b>時序與判讀</span><span><b>02</b>已知錯誤</span><span><b>03</b>地圖與匯出</span></div>
  <div class="inline"><label class="grow" for="selftestEnvironment">測試使用的環境<select id="selftestEnvironment"></select></label><button id="selftestStart" class="primary">執行進階自測</button><button id="selftestStop" hidden>停止自測</button></div>
- <p id="selftestStage" class="hint" role="status" aria-live="polite">合成資料會另外存放，不會讀寫你的研究專案。</p><progress id="selftestProgress" hidden aria-label="進階自測進行中"></progress>
+ <p id="selftestStage" class="hint" role="status" aria-live="polite">合成資料會另外存放，不會更動研究專案或環境套件。</p><progress id="selftestProgress" hidden aria-label="進階自測進行中"></progress>
  <div id="selftestResults"></div><p id="selftestError" class="error" hidden></p>
  <details class="operation-details"><summary>測試內容與限制</summary><p>透過所選環境執行 MintPy，檢查已知位移、診斷、DEM 誤差與日期異常，以及地理圖層與成果匯出。未執行或不適用的項目會另外列出。</p><p>這是軟體功能驗證，不能代替真實衛星資料的對位、解纏或研究品質判讀。測試中的地理網格是人工建立的，與實際觀測無關。</p><p id="selftestLocation" class="hint"></p><button id="selftestDownload" hidden>下載完整驗證紀錄</button><pre id="selftestLog">尚未執行。</pre></details>`;
  $('environmentPanel').after(panel);
@@ -28,7 +28,7 @@
   $('selftestStart').disabled=running||!$('selftestEnvironment').value||Boolean(window.workbenchState?.busy);
   $('selftestStart').textContent=job.status&&job.status!=='idle'?'重新執行進階自測':'執行進階自測';
   $('selftestEnvironment').disabled=running;$('selftestStop').hidden=!running;$('selftestProgress').hidden=!running;
-  $('selftestStage').textContent=job.stage||'合成資料會另外存放，不會讀寫你的研究專案。';
+  $('selftestStage').textContent=job.stage||'合成資料會另外存放，不會更動研究專案或環境套件。';
   $('selftestError').hidden=!job.error;$('selftestError').textContent=job.error||'';
   $('selftestLocation').textContent=job.report_path?'驗證紀錄：'+job.report_path:'';
   $('selftestLog').textContent=job.log_tail||job.log||'尚未執行。';$('selftestDownload').hidden=!job.report_path;
