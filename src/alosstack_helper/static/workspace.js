@@ -5,7 +5,7 @@
  const iconPaths={overview:'<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',plus:'<path d="M12 4v16M4 12h16"/>',layers:'<path d="m3 8 9-5 9 5-9 5-9-5Zm0 5 9 5 9-5M3 18l9 5 9-5"/>',tools:'<path d="M14 6a5 5 0 0 0-6 6L3 17l4 4 5-5a5 5 0 0 0 6-6l-3 3-4-4 3-3Z"/>',help:'<circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01"/>',folder:'<path d="M3 7V5a2 2 0 0 1 2-2h5l2 3h7a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',review:'<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',chart:'<path d="M4 3v17h17M6 15l5-6 4 3 5-7"/>',map:'<path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2V5ZM9 3v16M15 5v16"/>',log:'<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',check:'<path d="m5 12 4 4L20 5"/>',arrow:'<path d="M4 12h15m-5-5 5 5-5 5"/>',satellite:'<path d="m8 6 10 10-4 4L4 10 8 6Zm9-3 4 4-4 4-4-4 4-4ZM3 13l4 4-4 4-4-4M15 13l4-4M12 17l-4 4"/>'};
  function icon(name){const box=node('span',undefined,'ui-icon');box.setAttribute('aria-hidden','true');box.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+(iconPaths[name]||iconPaths.layers)+'</svg>';return box;}
  window.workbenchIcon=icon;
- for(const [id,name] of [['openOverview','overview'],['newProject','plus'],['openLibrary','layers'],['openWelcome','tools'],['openHelp','help']]){const b=$(id);if(b){const label=node('span',b.textContent.replace(/^＋\s*/,''));b.replaceChildren(icon(name),label);}}
+ for(const [id,name] of [['openOverview','overview'],['openGettingStarted','map'],['newProject','plus'],['openLibrary','layers'],['openWelcome','tools'],['openHelp','help']]){const b=$(id);if(b){const label=node('span',b.textContent.replace(/^＋\s*/,''));b.replaceChildren(icon(name),label);}}
 
  const main=document.querySelector('main');
  const dashboard=node('section');dashboard.id='workspaceOverview';dashboard.hidden=true;
@@ -19,6 +19,11 @@
  <div class="ws-heading"><div><div class="eyebrow">02 / CHOOSE A WORKFLOW</div><h2>研究目標與處理方式</h2></div><label class="ws-goal">顯示<select id="workspaceGoal"><option value="all">全部流程</option><option value="pair">兩期比較</option><option value="stack">多日期分析</option><option value="prepare">資料準備</option></select></label></div>
  <p class="hint">「已實作」表示介面與執行流程已提供；仍需通過專案健檢與科學品質檢查。規劃中的流程不能啟動。</p><div id="workspaceFlows" class="ws-flows"></div><div class="notice">MintPy 由已完成的 ALOS-2 多日期專案接續，請從專案總覽開啟原專案，再建立分析版本。</div>`;
  main.append(dashboard,chooser);
+ const starterEntry=node('section',undefined,'starter-overview-entry');
+ starterEntry.innerHTML='<div><span class="starter-entry-icon" aria-hidden="true">01 →</span><div><strong>第一次做 SAR？從這裡開始。</strong><p>先認識資料，再安排資料夾；一步一步建立第一個專案。</p><div class="starter-entry-route" aria-hidden="true"><span>準備工具</span><span>選擇資料</span><span>安排資料夾</span><span>開始準備</span></div></div></div><button id="overviewGettingStarted" class="primary">從零開始 →</button>';
+ dashboard.querySelector('.ws-heading').after(starterEntry);
+ const starterShortcut=node('button','不知道要準備哪些資料？看新手指引','starter-create-link');starterShortcut.id='createGettingStarted';chooser.querySelector('.intro').after(starterShortcut);
+ for(const id of ['openGettingStarted','overviewGettingStarted','createGettingStarted'])action($(id),()=>window.openGettingStarted());
  const headingActions=node('div',undefined,'ws-heading-actions'),createButton=$('overviewCreate');createButton.replaceWith(headingActions);headingActions.append(button('加入既有專案',()=>window.openExistingProject()),createButton);
  const registryNotice=node('div',undefined,'ws-registry-notice');registryNotice.id='registryNotice';registryNotice.hidden=true;registryNotice.setAttribute('role','status');
  $('overviewRecords').before(registryNotice);
@@ -29,7 +34,7 @@
  removeDialog.innerHTML='<h2 id="removeProjectTitle">從工作台移除專案？</h2><p id="removeProjectName"></p><p id="removeProjectPath" class="ws-path"></p><p id="removeProjectDescription">專案及其 MintPy／品質報告會從總覽隱藏。磁碟上的資料、成果和科學環境會保留；之後可從「已移除的專案」復原清單紀錄。</p><p id="removeProjectError" class="error" role="alert"></p><div class="ws-dialog-actions"><button id="cancelProjectRemoval" autofocus>取消</button><button id="confirmProjectRemoval" class="ws-remove-button">移除紀錄</button></div>';
  document.body.append(removeDialog);
  const legacyButton=node('button','匯入手動 ISCE2 成果');legacyButton.type='button';legacyButton.id='overviewLegacyImport';action(legacyButton,()=>window.openLegacyImport());dashboard.querySelector('.ws-heading').append(legacyButton);
- const portableEntry=node('section',undefined,'portable-overview-entry');portableEntry.innerHTML='<div><span class="portable-symbol" aria-hidden="true">⇄</span><div><strong>從另一台電腦接著分析</strong><p>匯入完整分析包，建立品質檢查與 MintPy 專案。</p></div></div><button id="overviewPortableImport">匯入可攜分析包</button>';headingActions.closest('.ws-heading').after(portableEntry);action($('overviewPortableImport'),()=>window.openPortableImport());
+ const portableEntry=node('section',undefined,'portable-overview-entry');portableEntry.innerHTML='<div><span class="portable-symbol" aria-hidden="true">⇄</span><div><strong>從另一台電腦接著分析</strong><p>匯入完整分析包，建立品質檢查與 MintPy 專案。</p></div></div><button id="overviewPortableImport">匯入可攜分析包</button>';starterEntry.after(portableEntry);action($('overviewPortableImport'),()=>window.openPortableImport());
  const nav=['openOverview','newProject','openLibrary','openWelcome'];
  let snapshot=null,flows=[],probe=null,probeVersion=0,loading=null,environmentLoading=false,pendingRemoval=null,removing=false;
  const maturity={implemented:'已實作',experimental:'試驗中',planned:'規劃中',preparation:'僅資料準備'};

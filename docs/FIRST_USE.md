@@ -5,6 +5,8 @@
 
 已安裝的使用者可直接看[日常操作、備份與故障排查](OPERATIONS.md)。主分支的新功能不會自動出現在已下載的 App；下載前請閱讀該版本的更新說明。
 
+不知道要準備什麼影像、DEM／WBD，或資料要放在哪裡？開啟工作台左側的「從零開始」，或看[資料與資料夾指引](GETTING_STARTED.md)。指南只協助準備與導航，不會自動安裝或開始處理。
+
 ## 1. 下載並開啟
 
 1. 到 [版本下載頁](https://github.com/chris20011026/sar-workbench/releases)，選擇更新說明所列的 `SAR-Workbench-版本-macOS-arm64.zip`。`Source code` 是程式碼，不是可雙擊的 App；新手請選 Mac App 安裝包。
