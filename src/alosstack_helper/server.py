@@ -36,6 +36,7 @@ from .workspace import overview, workflow_catalogue, identify
 from .environment_checks import EnvironmentChecks
 from .storage_usage import StorageUsage
 from .migration import Migrations
+from .portable_jobs import PortableJobs
 from .comparison import Comparisons
 from .reports import Reports
 from .legacy import LegacyImports
@@ -77,7 +78,8 @@ def make_server(engine, port=8765):
     confirmations = Confirmations()
     storage_usage = StorageUsage(engine)
     migrations = Migrations(engine)
-    migration_writes = ('/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/analysis-recover', '/api/selftest-start', '/api/create',
+    portable = PortableJobs(engine)
+    migration_writes = ('/api/portable-export-preview', '/api/portable-import-preview', '/api/portable-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review', '/api/analysis-recover', '/api/selftest-start', '/api/create',
                         '/api/project-remove', '/api/project-attach', '/api/recovery-enable',
                         '/api/analysis-rename', '/api/analysis-spatial', '/api/survey', '/api/geo-view', '/api/geo-point',
                         '/api/geo-export', '/api/geo-figure', '/api/setup-start', '/api/demo-start',
@@ -86,6 +88,12 @@ def make_server(engine, port=8765):
                         '/api/comparison-start', '/api/research-report-start', '/api/legacy-preview', '/api/legacy-create',
                         '/api/alos-preparation-scan', '/api/alos-preparation-run', '/api/alos-preparation-review', '/api/alos-review', '/api/alos-review-preview')
     launches_for_alos_guard = set(migration_writes) | {'/api/environment-check', '/api/migration-plan', '/api/migration-copy', '/api/migration-switch'}
+    launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review',
+                '/api/demo-start', '/api/terrain-start', '/api/import-start',
+                '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
+                '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach', '/api/storage-usage-start',
+                '/api/migration-plan', '/api/migration-copy', '/api/migration-switch', '/api/migration-abandon',
+                '/api/alos-preparation-coverage', '/api/sampling-review', '/api/sampling-preview', '/api/matching-review') + migration_writes
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args): pass
         def send(self, value, status=200, mime='application/json'):
@@ -106,7 +114,7 @@ def make_server(engine, port=8765):
         def do_GET(self):
             u = urlparse(self.path); q = parse_qs(u.query)
             try:
-                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css', '/sampling.js', '/sampling.css', '/alos-acceptance.js', '/mintpy-diagnostics.js', '/mintpy-diagnostics.css', '/operations.js', '/operations.css'):
+                if u.path in ('/', '/app.js', '/workspace.js', '/project-manager.js', '/migration.js', '/storage-usage.js', '/workspace.css', '/library.js', '/missions.js', '/recovery.js', '/workbench.js', '/maps.js', '/pair.js', '/tops.js', '/mintpy-settings.js', '/onboarding.js', '/import-metadata.js', '/confirmation.js', '/onboarding.css', '/style.css','/leaflet.js','/leaflet.css','/plotly-basic.min.js', '/research.js', '/research.css', '/legacy-import.js', '/legacy-import.css', '/tops-validation.js', '/tops-validation.css', '/alos-preparation.js', '/alos-preparation.css', '/sampling.js', '/sampling.css', '/alos-acceptance.js', '/mintpy-diagnostics.js', '/mintpy-diagnostics.css', '/operations.js', '/operations.css', '/portable.js', '/portable.css'):
                     if self.headers.get('Host') != f'127.0.0.1:{self.server.server_port}':
                         return self.send({'error':'Invalid host'},403)
                     name = 'index.html' if u.path=='/' else u.path[1:]
@@ -117,6 +125,11 @@ def make_server(engine, port=8765):
                         data = data.replace(b'__VERSION__', DISPLAY_VERSION.encode())
                     return self.send(data, mime=mimetypes.guess_type(name)[0] or 'text/plain')
                 if not self.auth(): return self.send({'error':'請從本機頁面操作。'},403)
+                if u.path == '/api/portable-provenance':
+                    from .portable import read_provenance
+                    return self.send(read_provenance(engine.get(q['id'][0])))
+                if u.path == '/api/portable': return self.send(portable.get(q['job'][0]))
+                if u.path == '/api/portable-latest': return self.send(portable.latest())
                 if u.path == '/api/selftest': return self.send(selftests.status())
                 if u.path == '/api/selftest-report': return self.send(selftests.report())
                 if u.path == '/api/sampling-preview-image':
@@ -158,7 +171,7 @@ def make_server(engine, port=8765):
                 if u.path == '/api/onboarding-job': return self.send(onboarding.job(q.get('job', [''])[0]))
                 if u.path == '/api/state':
                     nisar_jobs.reconcile(); conversion_jobs.reconcile(); alos_batches.reconcile()
-                    return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or selftests.status().get('status')=='running')})
+                    return self.send({'projects':engine.list(), 'unavailable_projects':engine.unavailable(), 'defaults':defaults(), 'workflows':WORKFLOWS, 'busy':bool(engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or selftests.status().get('status')=='running' or portable.busy())})
                 if u.path == '/api/tops-schema':return self.send({'fields':TOPS_FIELDS})
                 if u.path == '/api/pair-schema':return self.send({'fields':FIELDS})
                 if u.path == '/api/mintpy-schema':return self.send(catalogue(q.get('environment',[None])[0] or None))
@@ -211,12 +224,7 @@ def make_server(engine, port=8765):
             except Exception as e: self.send({'error':str(e)},400)
         def do_POST(self):
             # Serialize launch decisions across ISCE2, ISCE3 and environment setup.
-            launches = ('/api/setup-start', '/api/action', '/api/analysis-create', '/api/analysis-invert', '/api/analysis-review',
-                        '/api/demo-start', '/api/terrain-start', '/api/import-start',
-                        '/api/nisar-create', '/api/nisar-run', '/api/alos4-conversion-create', '/api/alos4-conversion-run', '/api/environment-check',
-                        '/api/create', '/api/project-remove', '/api/project-restore', '/api/project-attach', '/api/storage-usage-start',
-                        '/api/migration-plan', '/api/migration-copy', '/api/migration-switch', '/api/migration-abandon',
-                        '/api/alos-preparation-coverage', '/api/sampling-review', '/api/sampling-preview', '/api/matching-review') + migration_writes
+
             if self.path in launches:
                 with operation_lock: self.handle_post()
             else: self.handle_post()  # Stop and the native picker remain outside this lock.
@@ -226,6 +234,16 @@ def make_server(engine, port=8765):
                 size=int(self.headers.get('Content-Length',0))
                 if size > 1024*1024: raise ValueError('請求過大。')
                 d=json.loads(self.rfile.read(size))
+                if self.path == '/api/portable-stop': return self.send(portable.stop(d['job_id']))
+                if portable.busy() and self.path in launches:
+                    raise ValueError('可攜分析包正在讀寫檔案；請先等待完成或停止。')
+                if self.path in ('/api/portable-export-preview','/api/portable-import-preview','/api/portable-start'):
+                    if engine.active or nisar_jobs.active or conversion_jobs.active or alos_batches.active or migrations.busy() or selftests.status().get('status')=='running' or onboarding.runtime.status().get('status')=='running' or any(j['status']=='running' for j in onboarding.jobs.values()):
+                        raise ValueError('請先等待運算、安裝或搬移完成，再建立或匯入可攜包。')
+                    if self.path=='/api/portable-start':return self.send(portable.start(d['job_id'],d.get('reviewed') is True))
+                    if self.path=='/api/portable-export-preview' and not d.get('environment'):
+                        d['environment']=defaults()['env']
+                    return self.send(portable.preview('export' if self.path=='/api/portable-export-preview' else 'import',d))
                 if self.path == '/api/selftest-stop':
                     selftests.stop(); return self.send(selftests.status())
                 if selftests.status().get('status') == 'running' and self.path in launches_for_alos_guard:
@@ -415,6 +433,7 @@ def make_server(engine, port=8765):
             comparisons.shutdown()
             reports.shutdown()
             legacy.shutdown()
+            portable.shutdown()
             migrations.stop()
             storage_usage.stop(shutdown=True)
             super().server_close()
@@ -428,6 +447,7 @@ def make_server(engine, port=8765):
     server.comparisons = comparisons
     server.reports = reports
     server.legacy = legacy
+    server.portable = portable
     server.tops_validation = tops_validation
     server.sampling_reviews = sampling_reviews
     server.analyses = analyses
@@ -462,6 +482,7 @@ def main():
     if not args.no_browser: webbrowser.open(url)
     def shutdown(*_):
         server.selftests.shutdown()
+        server.portable.shutdown()
         server.migrations.stop()
         server.storage_usage.stop(shutdown=True)
         server.nisar_jobs.stop(shutdown=True)
@@ -475,6 +496,7 @@ def main():
     try: server.serve_forever()
     except KeyboardInterrupt: pass
     finally:
+        server.portable.shutdown()
         server.nisar_jobs.stop(shutdown=True)
         server.conversion_jobs.stop(shutdown=True)
         server.alos_batches.stop(shutdown=True)

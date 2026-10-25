@@ -32,6 +32,7 @@ jobs:
           node tests/test_sampling_ui.cjs
           node tests/test_navigation_ui.cjs
           node tests/test_operations_ui.cjs
+          node tests/test_portable_ui.cjs
           node tests/test_mintpy_diagnostics_ui.cjs
           node tests/test_alos_acceptance_ui.cjs
 

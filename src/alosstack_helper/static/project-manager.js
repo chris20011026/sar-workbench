@@ -8,6 +8,7 @@
  <div class="inline"><button id="saveProjectDetails" class="primary">儲存名稱與備註</button><span id="managerSaved" role="status" class="hint"></span></div>
  <section class="storage-section"><div class="card-heading"><h3>儲存位置與連線</h3><button id="recheckProjectStorage">重新檢查連線</button></div><div id="managerConnection" role="status"></div><div id="managerCandidates"></div></section>
  <section class="storage-section"><h3>安全搬移</h3><p>將運算已完成的專案複製到另一個位置，驗證成果後再切換。原專案會保留。</p><button id="openProjectMigration">開啟安全搬移精靈</button></section>
+ <section id="managerPortable" class="storage-section portable-manager" hidden><span class="portable-symbol" aria-hidden="true">⇄</span><div><h3>帶到另一台電腦分析</h3><p>完整帶走 MintPy 所需的干涉與幾何成果，匯入後建立獨立的新專案。</p><button id="openPortableExport">建立可攜分析包</button></div></section>
  <details class="storage-section" id="managerRelink"><summary>重新連結專案資料夾</summary><p class="hint">選擇原專案搬移後的位置。會核對專案代號，不搬移或複製影像。</p>
  <label>專案資料夾<span class="input-row"><input id="relinkPath" placeholder="選擇包含 proc 與 .helper 的資料夾"><button id="pickRelinkPath">選擇資料夾</button></span></label><button id="inspectRelink" class="storage-inspect">檢查這個位置</button><div id="relinkPreview"></div><button id="confirmRelink" class="primary" disabled>確認重新連結</button></details>
  <details class="storage-section"><summary>原始資料與地形路徑</summary><p class="hint">檢查來源、DEM、WBD 是否可讀。這裡不掃描影像內容，也不修改原處理設定。</p><div id="managerPaths"></div></details></section>`;
@@ -20,6 +21,7 @@
  function localAction(id,error,fn){action($(id),async()=>{$(error).textContent='';try{await fn();}catch(e){$(error).textContent=e.message;}});}
  function drawConnection(d){
   window.updateUsageConnection?.(d);
+  $('managerPortable').hidden=!(d.status==='online'&&d.workflow==='alosStack'&&['complete','imported'].includes(d.last_status));
   const box=$('managerConnection');box.replaceChildren(node('span',labels[d.status]||d.status,'ws-status '+(d.status==='online'?'complete':'unavailable')));
   box.append(node('p',d.volume?'儲存裝置：'+d.volume.label:'儲存於本機或指定資料夾'),node('p',d.root,'ws-path'));
   if(d.reason)box.append(node('p',d.reason,'notice'));
@@ -40,6 +42,7 @@
  window.openExistingProject=()=>{$('existingError').textContent='';$('existingPath').value='';invalidate('existing');importer.showModal();};
  $('closeProjectManager').onclick=()=>dialog.close();$('closeExistingProject').onclick=()=>importer.close();
  localAction('openProjectMigration','managerError',async()=>{const id=key,d=details;dialog.close();await window.openProjectMigration(id,d);});
+ localAction('openPortableExport','managerError',async()=>{const id=key,d=details;dialog.close();await window.openPortableExport(id,d);});
  dialog.addEventListener('close',()=>{generation++;key=null;window.closeStorageUsage?.();});
  localAction('saveProjectDetails','managerError',async()=>{
   const id=key;$('saveProjectDetails').disabled=true;

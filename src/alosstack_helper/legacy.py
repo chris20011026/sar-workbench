@@ -411,6 +411,9 @@ def create_wrapper(request, preview, key):
 def require_legacy_source(state):
     """Check the import receipt before any new QC/MintPy run; never write source."""
     if not state.get('import_only'): return
+    if state.get('portable_import'):
+        from .portable import require_portable_source
+        return require_portable_source(state)
     root = Path(state['config']['root']); receipt = root / '.helper/legacy-source.json'
     if receipt.is_symlink(): raise ValueError('匯入來源紀錄不能是連結。')
     saved = json.loads(receipt.read_text()); source = Path(saved['source'])

@@ -1,6 +1,6 @@
 # SAR 研究工作台（SAR Workbench）
 
-本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.8.0 beta 6**，新增已知答案的進階自測、MintPy 階段恢復與圖像化工作導覽；保留電離層校正後確認、cmd4 驗收及 MintPy 人工判讀。
+本機執行的視覺化 SAR 處理介面，沿用 ISCE2 與 MintPy 的科學運算核心。目前版本 **0.8.0 beta 7**，新增可攜分析資料包，讓已完成的標準 alosStack 成果在新位置建立品質檢查與 MintPy 分析；保留進階自測、階段恢復、圖像化導覽及人工判讀關卡。
 
 - **[相容性與匹配品質](docs/ALOS_QUALITY.md)**：本版新增選用影格的波長／頻寬／Doppler 摘要，以及 cmd1 匹配完成後、cmd2 前的獨立人工關卡。這些診斷不等於真實跨衛星科學驗證。
 - **[日常操作、備份與故障排查](docs/OPERATIONS.md)**：網頁側欄也有離線說明；已安裝的工作台不依賴 ChatGPT／Codex 訂閱。
@@ -9,6 +9,7 @@
 - **[校正、成果與 MintPy 判讀](docs/REVIEW_GATES.md)**：先看診斷與缺漏，再記錄判讀；報告或來源變動會要求重新確認。
 - **[MintPy 成果比較](docs/COMPARISON.md)**：並排地圖、同步縮放、設定差異、有效範圍統計與原生點位曲線。只有格網、參考基準、單位與時間模型等條件相容，才提供 B − A 差值。
 - **[研究報告](docs/RESEARCH_REPORTS.md)**：由已完成分析產生可編輯 Word、可列印網頁、JSON 設定快照與包含圖片的報告包，可附上比較及選定點位曲線。
+- **[可攜分析資料包](docs/PORTABLE_PROJECT.md)**：完整複製並核對後續分析需要的影像與描述資料；換位置或電腦後驗證匯入，選擇當地環境，建立新分析。這是下游分析資料包，不是原始 SAR 前處理與舊檢查點的完整封存。
 - **[匯入手動 ISCE2 成果](docs/LEGACY_IMPORT.md)**：目前限完整、標準目錄的 alosStack 成果；預覽後建立獨立工作資料夾，原始資料唯讀，可接續品質檢查與 MintPy。不是所有 ISCE2 成果的通用匯入器，也不恢復原本 cmd1–4。
 - **[Sentinel-1 真實影像驗證紀錄](docs/SENTINEL_VALIDATION.md)**：整理處理證據、人工評閱與獨立執行比較紀錄。工具與合成測試已完成，**真實 IW SLC 端到端驗證仍待進行，topsStack 尚未開放**。
 
@@ -27,9 +28,9 @@
 | NISAR 雙日期（ISCE3） | 實驗功能；獨立環境，未完成真實 RSLC 全流程驗證 |
 | ALOS-4 格式轉換／混合資料健檢 | 實驗功能；不自動接續跨衛星干涉 |
 
-**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases/latest) 取得已發布的 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
+**第一次使用（Apple Silicon Mac / macOS 14.5+）**：到 [下載頁](https://github.com/chris20011026/sar-workbench/releases) 取得已發布的 Mac App，解壓縮後雙擊。啟動器會準備必要工具，再由網頁安裝並驗證固定版本的 ISCE2、MintPy、SNAPHU。**不需要先安裝 Python、Conda 或使用終端機**；首次安裝需要網路、下載時間與至少 12 GB 工具空間。此測試版尚未 Apple 公證，初次開啟可能需 macOS 確認。
 
-[第一次使用指南](docs/FIRST_USE.md) · [0.8 beta 6 更新](docs/RELEASE_0.8_BETA6.md) · [進階自測](docs/ADVANCED_SELFTEST.md) · [0.8 beta 5 更新](docs/RELEASE_0.8_BETA5.md) · [0.8 beta 4 更新](docs/RELEASE_0.8_BETA4.md) · [0.8 版本紀錄](docs/RELEASE_0.8.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
+[第一次使用指南](docs/FIRST_USE.md) · [0.8 beta 7 更新](docs/RELEASE_0.8_BETA7.md) · [0.8 beta 6 更新](docs/RELEASE_0.8_BETA6.md) · [進階自測](docs/ADVANCED_SELFTEST.md) · [0.8 beta 5 更新](docs/RELEASE_0.8_BETA5.md) · [0.8 beta 4 更新](docs/RELEASE_0.8_BETA4.md) · [0.8 版本紀錄](docs/RELEASE_0.8.md) · [自動測試紀錄](https://github.com/chris20011026/sar-workbench/actions/workflows/validation.yml)
 
 「工具與環境」提供合成教學、ALOS-2 ZIP／資料夾匯入與公開地形下載。真實 SAR 影像仍需自行取得，科學參考點與電離層品質仍需判讀。自動安裝使用 [insar-arm](https://github.com/chris20011026/insar-arm) 的固定套件，放在工作台專用資料夾；既有 Conda 環境與研究專案保持原設定。
 
@@ -133,7 +134,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 
 ## 0.2：品質檢查與 MintPy
 
-入口現在列出六種處理方式。0.2 開放 alosStack；0.4 另加入 alos2App 的 Stripmap 雙日期試用。topsApp、topsStack、stripmapApp、stripmapStack 明確標示規劃中，伺服器也拒絕尚未支援的模式。
+入口列出六種處理方式。已開放 alosStack，以及 alos2App 的 Stripmap 雙日期試用；topsApp 提供 S1A／S1B IW SLC 雙日期試驗流程，仍待真實影像端到端驗證。topsStack、stripmapApp 和 stripmapStack 明確標示規劃中，伺服器拒絕啟動尚未支援的模式。
 
 已完成的 alosStack 專案可在「成果品質 / MintPy 分析」區操作：
 
@@ -150,7 +151,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -v
 
 此版本提供雷達座標下的**基礎時序流程**。預設不進行氣象下載、大氣校正、固體潮、二次電離層校正或解纏錯誤修正。空間坡度與 DEM 誤差校正由表單明確選擇。0.3 已新增地圖、地理編碼與 GeoTIFF 匯出（見下節）；KMZ、其餘 ISCE2 工作流及遠端佇列尚未實作。原有 ISCE2 電離層校正是否啟用保留在分析紀錄中。位移/速度為相對空間參考點及時間參考日期的 LOS 值：正值朝向衛星，負值遠離衛星，不能直接等同垂直沉降。
 
-分析與原 ISCE2 運算共用同一個工作鎖；停止按鈕停止所啟動的子程序。中斷後保留診斷紀錄並另建分析版本，不會偷偷接續半成品。多個伺服器同時操作同一專案不受支援。
+分析與原 ISCE2 運算共用同一個工作鎖；停止按鈕停止所啟動的子程序。中斷後保留診斷紀錄；有完整階段前副本時可由[恢復中心](docs/RECOVERY.md)驗證後建立新版本，沒有副本時需另建分析，不直接續跑半成品。多個伺服器同時操作同一專案不受支援。
 
 ### 驗證紀錄（2026-10-03）
 

@@ -29,6 +29,7 @@
  removeDialog.innerHTML='<h2 id="removeProjectTitle">從工作台移除專案？</h2><p id="removeProjectName"></p><p id="removeProjectPath" class="ws-path"></p><p id="removeProjectDescription">專案及其 MintPy／品質報告會從總覽隱藏。磁碟上的資料、成果和科學環境會保留；之後可從「已移除的專案」復原清單紀錄。</p><p id="removeProjectError" class="error" role="alert"></p><div class="ws-dialog-actions"><button id="cancelProjectRemoval" autofocus>取消</button><button id="confirmProjectRemoval" class="ws-remove-button">移除紀錄</button></div>';
  document.body.append(removeDialog);
  const legacyButton=node('button','匯入手動 ISCE2 成果');legacyButton.type='button';legacyButton.id='overviewLegacyImport';action(legacyButton,()=>window.openLegacyImport());dashboard.querySelector('.ws-heading').append(legacyButton);
+ const portableEntry=node('section',undefined,'portable-overview-entry');portableEntry.innerHTML='<div><span class="portable-symbol" aria-hidden="true">⇄</span><div><strong>從另一台電腦接著分析</strong><p>匯入完整分析包，建立品質檢查與 MintPy 專案。</p></div></div><button id="overviewPortableImport">匯入可攜分析包</button>';headingActions.closest('.ws-heading').after(portableEntry);action($('overviewPortableImport'),()=>window.openPortableImport());
  const nav=['openOverview','newProject','openLibrary','openWelcome'];
  let snapshot=null,flows=[],probe=null,probeVersion=0,loading=null,environmentLoading=false,pendingRemoval=null,removing=false;
  const maturity={implemented:'已實作',experimental:'試驗中',planned:'規劃中',preparation:'僅資料準備'};
